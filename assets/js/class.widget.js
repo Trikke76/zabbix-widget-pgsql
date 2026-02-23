@@ -115,6 +115,16 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 			row.appendChild(lbl);
 			row.appendChild(val);
+
+			try {
+				var historyPts = (metric && Array.isArray(metric.history) && metric.history.length > 1)
+					? metric.history : null;
+				var svg = self._buildSparkline(historyPts, metric ? metric.value : null);
+				row.appendChild(svg);
+			} catch (sparkErr) {
+				console.warn('[PgsqlClusterWidget] host sparkline failed for', spec.key, sparkErr);
+			}
+
 			hostBox.appendChild(row);
 		});
 
@@ -128,7 +138,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			});
 		}
 
-		// ── Metric cards (sparklines) ────────────────────────────────────
+		// ── Metric definitions ───────────────────────────────────────────
 		var metricThemes = {
 			active_connections: 'blue',
 			wal_write:          'teal',
@@ -159,6 +169,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			{key: 'wal_count',          title: 'WAL segments',          source: 'cluster', visible: 'show_wal_count'}
 		];
 
+		// ── Draw cards for selected DB ───────────────────────────────────
 		function draw(dbName) {
 			var db = null;
 			for (var i = 0; i < databases.length; i++) {
@@ -194,7 +205,12 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 				card.appendChild(valueEl);
 
 				try {
-					var svg = self._buildSparkline(metric ? metric.value : null, spec.key);
+					// Use real history array from the metric; fall back to empty array
+					var historyPts = (metric && Array.isArray(metric.history) && metric.history.length > 1)
+						? metric.history
+						: null;
+
+					var svg = self._buildSparkline(historyPts, metric ? metric.value : null);
 					card.appendChild(svg);
 				} catch (sparkErr) {
 					console.warn('[PgsqlClusterWidget] sparkline failed for', spec.key, sparkErr);
@@ -222,56 +238,68 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		draw(selected);
 	}
 
-	_buildSparkline(rawValue, metricKey) {
-		var W = 200, H = 36, N = 20;
-		var currentVal = Number(rawValue);
-		var hasVal = rawValue !== null && rawValue !== undefined && rawValue !== '' && !isNaN(currentVal);
-		var rand = this._seededRng(String(metricKey || '') + String(hasVal ? rawValue : '0'));
+	/**
+	 * Build a sparkline SVG.
+	 *
+	 * @param {number[]|null} historyPts  Real history values (oldest→newest), or null for no-data state.
+	 * @param {*}             rawValue    The current lastvalue, used as the final point if history is sparse.
+	 */
+	_buildSparkline(historyPts, rawValue) {
+		var W = 200, H = 36;
+		var ns  = 'http://www.w3.org/2000/svg';
 
-		var pts = [], i;
-		if (hasVal) {
-			var base  = Math.abs(currentVal) || 1;
-			var noise = base * 0.30;
-			for (i = 0; i < N - 1; i++) {
-				var t    = i / (N - 2);
-				var wave = Math.sin(t * Math.PI * 2.5) * noise * 0.4;
-				var jit  = (rand() - 0.5) * noise;
-				pts.push(Math.max(0, base + wave + jit));
+		var pts;
+
+		if (historyPts && historyPts.length >= 2) {
+			// Real data: use as-is, ensure last point equals current lastvalue when available
+			pts = historyPts.slice();
+			var currentVal = Number(rawValue);
+			if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal)) {
+				pts[pts.length - 1] = currentVal;
 			}
-			pts.push(Math.abs(currentVal));
 		} else {
-			for (i = 0; i < N; i++) { pts.push(rand() * 0.5); }
+			// No history available: draw a flat zero line so the card still has a chart area
+			// but it's visually obvious there's no data (flat line at the bottom)
+			pts = [0, 0, 0, 0, 0];
 		}
 
+		// Normalise to canvas coordinates
 		var minV = pts[0], maxV = pts[0];
-		for (i = 1; i < pts.length; i++) {
+		for (var i = 1; i < pts.length; i++) {
 			if (pts[i] < minV) { minV = pts[i]; }
 			if (pts[i] > maxV) { maxV = pts[i]; }
 		}
-		var rng = maxV - minV || 1;
-		var mg = H * 0.08, useH = H - mg * 2;
+
+		var rng = maxV - minV;
+		// If all values are the same (flat line), draw it mid-height so it's clearly intentional
+		var mg   = H * 0.10;
+		var useH = H - mg * 2;
 
 		var coords = pts.map(function(v, idx) {
-			return [(idx / (pts.length - 1)) * W, H - mg - ((v - minV) / rng) * useH];
+			var xPos = (idx / (pts.length - 1)) * W;
+			var yPos = rng === 0
+				? (H / 2)  // flat: centre of chart
+				: (H - mg - ((v - minV) / rng) * useH);
+			return [xPos, yPos];
 		});
 
-		var d = 'M ' + coords[0][0] + ',' + coords[0][1];
+		// Catmull-Rom → cubic bezier path
+		var d = 'M ' + coords[0][0].toFixed(2) + ',' + coords[0][1].toFixed(2);
 		for (i = 0; i < coords.length - 1; i++) {
 			var p0 = coords[Math.max(i - 1, 0)];
 			var p1 = coords[i];
 			var p2 = coords[i + 1];
 			var p3 = coords[Math.min(i + 2, coords.length - 1)];
-			var cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-			var cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-			var cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-			var cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-			d += ' C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2[0] + ',' + p2[1];
+			var cp1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2);
+			var cp1y = (p1[1] + (p2[1] - p0[1]) / 6).toFixed(2);
+			var cp2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2);
+			var cp2y = (p2[1] - (p3[1] - p1[1]) / 6).toFixed(2);
+			d += ' C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
 		}
 
 		var last  = coords[coords.length - 1];
-		var areaD = d + ' L ' + last[0] + ',' + H + ' L ' + coords[0][0] + ',' + H + ' Z';
+		var areaD = d + ' L ' + last[0].toFixed(2) + ',' + H + ' L ' + coords[0][0].toFixed(2) + ',' + H + ' Z';
 
-		var ns  = 'http://www.w3.org/2000/svg';
 		var svg = document.createElementNS(ns, 'svg');
 		svg.setAttribute('class', 'pgdb-widget__sparkline');
 		svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -287,29 +315,14 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		var dot = document.createElementNS(ns, 'circle');
 		dot.setAttribute('class', 'spark-dot');
-		dot.setAttribute('cx', '' + last[0]);
-		dot.setAttribute('cy', '' + last[1]);
+		dot.setAttribute('cx', last[0].toFixed(2));
+		dot.setAttribute('cy', last[1].toFixed(2));
 		dot.setAttribute('r', '2.5');
 
 		svg.appendChild(area);
 		svg.appendChild(line);
 		svg.appendChild(dot);
 		return svg;
-	}
-
-	_seededRng(seedStr) {
-		var h = 0;
-		for (var i = 0; i < seedStr.length; i++) {
-			h = ((h << 5) - h + seedStr.charCodeAt(i)) | 0;
-		}
-		var s = (h >>> 0) + 1;
-		return function() {
-			s = (s + 0x6D2B79F5) >>> 0;
-			var t = (s ^ (s >>> 15)) >>> 0;
-			t = (t * ((1 | s) >>> 0)) >>> 0;
-			t = (t ^ (t + ((t * 61 | t) >>> 0))) >>> 0;
-			return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-		};
 	}
 
 	_formatValue(rawValue, units) {

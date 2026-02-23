@@ -2,6 +2,8 @@
 
 Custom widget om databases in een PostgreSQL cluster selecteerbaar te tonen met kernmetrics uit het officiele template `PostgreSQL by Zabbix agent 2`.
 
+![PGSQL widget](pgsql-widget.png)
+
 ## Wat deze widget doet
 
 - Leest DB-lijst uit `pgsql.db.discovery[...]`.
@@ -17,19 +19,19 @@ Custom widget om databases in een PostgreSQL cluster selecteerbaar te tonen met 
 
 ## Structuur
 
-- `pgsql_cluster_widget/manifest.json`
-- `pgsql_cluster_widget/Widget.php`
-- `pgsql_cluster_widget/actions/WidgetView.php`
-- `pgsql_cluster_widget/includes/WidgetForm.php`
-- `pgsql_cluster_widget/views/widget.view.php`
-- `pgsql_cluster_widget/views/widget.edit.php`
-- `pgsql_cluster_widget/assets/js/class.widget.js`
-- `pgsql_cluster_widget/assets/css/widget.css`
-- `pgsql_cluster_widget/assets/img/postgres-icon-24.svg`
+- `zabbix-widget-pgsql/manifest.json`
+- `zabbix-widget-pgsql/Widget.php`
+- `zabbix-widget-pgsql/actions/WidgetView.php`
+- `zabbix-widget-pgsql/includes/WidgetForm.php`
+- `zabbix-widget-pgsql/views/widget.view.php`
+- `zabbix-widget-pgsql/views/widget.edit.php`
+- `zabbix-widget-pgsql/assets/js/class.widget.js`
+- `zabbix-widget-pgsql/assets/css/widget.css`
+- `zabbix-widget-pgsql/assets/img/postgres-icon-24.svg`
 
 ## Installatie
 
-1. Kopieer de map `pgsql_cluster_widget` naar je Zabbix frontend modules map, meestal:
+1. Kopieer de map `zabbix-widget-pgsql` naar je Zabbix frontend modules map, meestal:
    - `/usr/share/zabbix/modules/`
 2. Herstart webserver/php-fpm indien nodig.
 3. In Zabbix: `Administration -> General -> Modules` en activeer `PostgreSQL Cluster Overview`.

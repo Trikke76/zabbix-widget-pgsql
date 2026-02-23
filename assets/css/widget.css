@@ -78,6 +78,7 @@
 		inset 0 -1px 0 rgba(0, 0, 0, 0.08);
 }
 
+/* ── Host metrics grid ── */
 .pgdb-widget__host-metrics {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(170px, 1fr));
@@ -88,32 +89,60 @@
 .pgdb-widget__host-metric {
 	border: 1px solid rgba(120, 130, 140, 0.25);
 	border-radius: 6px;
-	padding: 6px 9px;
-	background: rgba(255, 255, 255, 0.03);
+	padding: 8px 10px 4px 10px;
+	background: rgba(20, 26, 32, 0.04);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
 }
 
 .pgdb-widget__host-metric-label {
-	font-size: 11px;
-	opacity: 0.82;
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	opacity: 0.6;
 	line-height: 1.2;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .pgdb-widget__host-metric-value {
 	margin-top: 2px;
-	font-size: 14px;
+	font-size: 16px;
 	font-weight: 700;
 	line-height: 1.2;
 }
 
+/* Sparkline inside host metric tiles — reuse the same SVG classes */
+.pgdb-widget__host-metric .pgdb-widget__sparkline {
+	margin-top: 5px;
+	height: 28px;
+}
+
+/* Color theme for host metric sparklines */
+.pgdb-widget__host-metric .spark-line,
+.pgdb-widget__host-metric .spark-dot { stroke: #29b6f6; fill: #29b6f6; }
+.pgdb-widget__host-metric .spark-area { fill: #29b6f6; opacity: 0.12; }
+.pgdb-widget__host-metric .pgdb-widget__host-metric-value { color: inherit; }
+
+/* CPU warn / high overrides */
 .pgdb-widget__host-metric.is-cpu-warn {
 	border-color: rgba(243, 156, 18, 0.55);
 	box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.18);
 }
+.pgdb-widget__host-metric.is-cpu-warn .spark-line,
+.pgdb-widget__host-metric.is-cpu-warn .spark-dot { stroke: #ffa726; fill: #ffa726; }
+.pgdb-widget__host-metric.is-cpu-warn .spark-area { fill: #ffa726; }
 
 .pgdb-widget__host-metric.is-cpu-high {
 	border-color: rgba(230, 126, 34, 0.65);
 	box-shadow: inset 0 0 0 1px rgba(230, 126, 34, 0.24);
 }
+.pgdb-widget__host-metric.is-cpu-high .spark-line,
+.pgdb-widget__host-metric.is-cpu-high .spark-dot { stroke: #ef5350; fill: #ef5350; }
+.pgdb-widget__host-metric.is-cpu-high .spark-area { fill: #ef5350; }
 
 .pgdb-widget__ring.is-active .pgdb-widget__ring-btn {
 	border-color: #00bde8;
@@ -234,7 +263,7 @@
 .pgdb-widget__card[data-theme="teal"] .spark-area { fill: #00bcd4; }
 .pgdb-widget__card[data-theme="teal"] .pgdb-widget__metric-value { color: #00838f; }
 
-/* Dark-theme Zabbix override: invert value colors for dark dashboards */
+/* Dark-theme overrides */
 @media (prefers-color-scheme: dark) {
 	.pgdb-widget__card[data-theme="blue"] .pgdb-widget__metric-value  { color: #81d4fa; }
 	.pgdb-widget__card[data-theme="green"] .pgdb-widget__metric-value { color: #80cbc4; }
@@ -247,11 +276,12 @@
 		background: rgba(255, 255, 255, 0.03);
 		border-color: rgba(255, 255, 255, 0.1);
 	}
+
+	.pgdb-widget__host-metric {
+		background: rgba(255, 255, 255, 0.03);
+		border-color: rgba(255, 255, 255, 0.1);
+	}
 }
-
-/* Sparkline draw-on animation */
-
-.pgdb-widget__sparkline .spark-line {
 
 @media (max-width: 900px) {
 	.pgdb-widget__header {
