@@ -32,6 +32,9 @@ $form->addField(new CWidgetFieldSelectView($data['fields']['show_rollback_rate']
 $form->addField(new CWidgetFieldSelectView($data['fields']['show_locks_total']));
 $form->addField(new CWidgetFieldSelectView($data['fields']['show_deadlocks_rate']));
 $form->addField(new CWidgetFieldSelectView($data['fields']['show_slow_queries']));
+$form->addField(new CWidgetFieldSelectView($data['fields']['show_cache_hit']));
+$form->addField(new CWidgetFieldSelectView($data['fields']['show_replication_lag']));
+$form->addField(new CWidgetFieldSelectView($data['fields']['show_bloat']));
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['cpu_warn_threshold']));
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['cpu_high_threshold']));
 

@@ -151,7 +151,10 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			rollback_rate:      'orange',
 			locks_total:        'orange',
 			deadlocks_rate:     'red',
-			slow_queries:       'red'
+			slow_queries:       'red',
+			cache_hit:          'green',
+			replication_lag:    'orange',
+			bloat:              'red'
 		};
 
 		var orderedMetrics = [
@@ -166,7 +169,10 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			{key: 'deadlocks_rate',     title: 'Deadlocks/s',                              visible: 'show_deadlocks_rate'},
 			{key: 'slow_queries',       title: 'Slow queries',                             visible: 'show_slow_queries'},
 			{key: 'wal_receive',        title: 'WAL receive/s',         source: 'cluster', visible: 'show_wal_receive'},
-			{key: 'wal_count',          title: 'WAL segments',          source: 'cluster', visible: 'show_wal_count'}
+			{key: 'wal_count',          title: 'WAL segments',          source: 'cluster', visible: 'show_wal_count'},
+			{key: 'cache_hit',          title: 'Cache hit ratio',       source: 'cluster', visible: 'show_cache_hit'},
+			{key: 'replication_lag',    title: 'Replication lag (s)',   source: 'cluster', visible: 'show_replication_lag'},
+			{key: 'bloat',              title: 'Bloating tables',                          visible: 'show_bloat'}
 		];
 
 		// ── Draw cards for selected DB ───────────────────────────────────
@@ -199,7 +205,26 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 				var valueEl = document.createElement('div');
 				valueEl.className = 'pgdb-widget__metric-value';
-				valueEl.textContent = self._formatValue(metric ? metric.value : null, metric ? metric.units : null);
+				var rawVal  = metric ? metric.value : null;
+				var rawUnit = metric ? metric.units : null;
+				if (spec.key === 'cache_hit') {
+					var pct = Number(rawVal);
+					valueEl.textContent = (rawVal !== null && !isNaN(pct))
+						? ((pct <= 1 ? pct * 100 : pct).toFixed(2) + ' %')
+						: 'n/a';
+				} else if (spec.key === 'replication_lag') {
+					var secs = Number(rawVal);
+					valueEl.textContent = (rawVal !== null && !isNaN(secs))
+						? (secs.toFixed(1) + ' s')
+						: 'n/a';
+				} else if (spec.key === 'bloat') {
+					var n = Number(rawVal);
+					valueEl.textContent = (rawVal !== null && !isNaN(n))
+						? Math.round(n).toLocaleString()
+						: 'n/a';
+				} else {
+					valueEl.textContent = self._formatValue(rawVal, rawUnit);
+				}
 
 				card.appendChild(titleEl);
 				card.appendChild(valueEl);

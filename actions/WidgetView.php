@@ -20,14 +20,24 @@ class WidgetView extends CControllerDashboardWidgetView {
 		'pgsql.dbstat.xact_rollback.rate[' => 'rollback_rate',
 		'pgsql.dbstat.deadlocks.rate[' => 'deadlocks_rate',
 		'pgsql.locks.total[' => 'locks_total',
-		'pgsql.queries.query.slow_count[' => 'slow_queries'
+		'pgsql.queries.query.slow_count[' => 'slow_queries',
+		'pgsql.db.bloating_tables[' => 'bloat'
 	];
 
 	private const CLUSTER_METRICS = [
 		'pgsql.connections.sum.active' => 'active_connections',
 		'pgsql.wal.write' => 'wal_write',
 		'pgsql.wal.receive' => 'wal_receive',
-		'pgsql.wal.count' => 'wal_count'
+		'pgsql.wal.count' => 'wal_count',
+		'pgsql.cache.hit' => 'cache_hit'
+	];
+
+	/**
+	 * Cluster metric key prefixes for items that have macro parameters in their key.
+	 * These are matched with strpos instead of exact key match.
+	 */
+	private const CLUSTER_METRICS_PREFIX = [
+		'pgsql.replication.lag.sec[' => 'replication_lag'
 	];
 
 	protected function doAction(): void {
@@ -295,17 +305,32 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 		foreach ($items as $item) {
 			$key = $item['key_'];
-			if (!array_key_exists($key, self::CLUSTER_METRICS)) {
+
+			// Exact match
+			if (array_key_exists($key, self::CLUSTER_METRICS)) {
+				$result[self::CLUSTER_METRICS[$key]] = [
+					'itemid' => (string) $item['itemid'],
+					'label' => $item['name'],
+					'value' => $item['lastvalue'],
+					'units' => $item['units'],
+					'history' => []
+				];
 				continue;
 			}
 
-			$result[self::CLUSTER_METRICS[$key]] = [
-				'itemid' => (string) $item['itemid'],
-				'label' => $item['name'],
-				'value' => $item['lastvalue'],
-				'units' => $item['units'],
-				'history' => []
-			];
+			// Prefix match (e.g. replication lag has macro parameters in key)
+			foreach (self::CLUSTER_METRICS_PREFIX as $prefix => $alias) {
+				if (strpos($key, $prefix) === 0 && !array_key_exists($alias, $result)) {
+					$result[$alias] = [
+						'itemid' => (string) $item['itemid'],
+						'label' => $item['name'],
+						'value' => $item['lastvalue'],
+						'units' => $item['units'],
+						'history' => []
+					];
+					break;
+				}
+			}
 		}
 
 		return $result;
@@ -455,7 +480,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'show_active_connections', 'show_wal_write', 'show_wal_receive',
 			'show_wal_count', 'show_db_size', 'show_backends', 'show_temp_bytes',
 			'show_commit_rate', 'show_rollback_rate', 'show_locks_total',
-			'show_deadlocks_rate', 'show_slow_queries'
+			'show_deadlocks_rate', 'show_slow_queries',
+			'show_cache_hit', 'show_replication_lag', 'show_bloat'
 		];
 
 		$result = [];
@@ -479,7 +505,10 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'rollback_rate'      => 'show_rollback_rate',
 			'locks_total'        => 'show_locks_total',
 			'deadlocks_rate'     => 'show_deadlocks_rate',
-			'slow_queries'       => 'show_slow_queries'
+			'slow_queries'       => 'show_slow_queries',
+			'cache_hit'          => 'show_cache_hit',
+			'replication_lag'    => 'show_replication_lag',
+			'bloat'              => 'show_bloat'
 		];
 
 		$result = [];
