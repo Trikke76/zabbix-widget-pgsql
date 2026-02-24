@@ -214,7 +214,7 @@
 	width: 100%;
 	height: 36px;
 	display: block;
-	overflow: visible;
+	overflow: hidden;
 }
 
 .pgdb-widget__sparkline .spark-area {
