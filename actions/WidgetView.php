@@ -43,7 +43,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 	protected function doAction(): void {
 		try {
 			$fields = $this->fields_values;
-			$show_optional = $this->toBool($fields['show_optional'] ?? 1, true);
 			$cpu_warn_threshold = $this->toFloat($fields['cpu_warn_threshold'] ?? 1.00, 1.00);
 			$cpu_high_threshold = $this->toFloat($fields['cpu_high_threshold'] ?? 2.00, 2.00);
 			$hostid = $this->extractHostId($fields['hostids'] ?? null);
@@ -55,7 +54,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 					'databases' => [],
 					'error' => _('Select a host first.'),
 					'default_db' => $fields['default_db'] ?? '',
-					'show_optional' => $show_optional,
 					'icon_url' => $this->iconUrl(),
 					'user' => ['debug_mode' => $this->getDebugMode()]
 				]));
@@ -136,7 +134,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 				'cpu_warn_threshold' => $cpu_warn_threshold,
 				'cpu_high_threshold' => $cpu_high_threshold,
 				'default_db' => $fields['default_db'] ?? '',
-				'show_optional' => $show_optional,
 				'error' => null,
 				'icon_url' => $this->iconUrl(),
 				'user' => ['debug_mode' => $this->getDebugMode()]
@@ -202,18 +199,19 @@ class WidgetView extends CControllerDashboardWidgetView {
 	 * Bulk fetch history for a set of item IDs.
 	 * Returns [ itemid => [ float, float, ... ] ] (oldest → newest, max HISTORY_LIMIT points).
 	 *
-	 * Zabbix history types:
-	 *   0 = float, 1 = char, 2 = log, 3 = uint, 4 = text
+	 * Fetches newest-first in batches of 10 to guarantee HISTORY_LIMIT points
+	 * per item regardless of how many total items are queried at once.
+	 *
+	 * Zabbix history types: 0 = float, 3 = uint
 	 */
 	private function fetchHistoryBulk(array $itemid_vtype_map): array {
 		if (!$itemid_vtype_map) {
 			return [];
 		}
 
-		// Group by value_type so we make at most one API call per numeric type
+		// Group by value_type
 		$by_type = [];
 		foreach ($itemid_vtype_map as $itemid => $vtype) {
-			// Only numeric types (0 = float, 3 = uint)
 			if ($vtype === \ITEM_VALUE_TYPE_FLOAT || $vtype === \ITEM_VALUE_TYPE_UINT64) {
 				$by_type[$vtype][] = $itemid;
 			}
@@ -222,23 +220,33 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$history_map = [];
 
 		foreach ($by_type as $vtype => $itemids) {
-			$rows = API::History()->get([
-				'output' => ['itemid', 'clock', 'value'],
-				'history' => $vtype,
-				'itemids' => $itemids,
-				'sortfield' => 'clock',
-				'sortorder' => \ZBX_SORT_UP,
-				'limit' => count($itemids) * self::HISTORY_LIMIT
-			]);
+			// Batch items in chunks of 10 so the limit covers all items in the chunk
+			$chunks = array_chunk($itemids, 10);
 
-			// Group rows by itemid, keep last HISTORY_LIMIT per item
-			$grouped = [];
-			foreach ($rows as $row) {
-				$grouped[(string) $row['itemid']][] = (float) $row['value'];
-			}
-			foreach ($grouped as $iid => $values) {
-				// Trim to last HISTORY_LIMIT points (oldest→newest already sorted)
-				$history_map[$iid] = array_slice($values, -self::HISTORY_LIMIT);
+			foreach ($chunks as $chunk) {
+				$rows = API::History()->get([
+					'output'    => ['itemid', 'value'],
+					'history'   => $vtype,
+					'itemids'   => $chunk,
+					'sortfield' => 'clock',
+					'sortorder' => \ZBX_SORT_DOWN,
+					'limit'     => count($chunk) * self::HISTORY_LIMIT
+				]);
+
+				// Group by itemid, cap at HISTORY_LIMIT, then reverse to oldest→newest
+				$grouped = [];
+				foreach ($rows as $row) {
+					$iid = (string) $row['itemid'];
+					if (!isset($grouped[$iid])) {
+						$grouped[$iid] = [];
+					}
+					if (count($grouped[$iid]) < self::HISTORY_LIMIT) {
+						$grouped[$iid][] = (float) $row['value'];
+					}
+				}
+				foreach ($grouped as $iid => $values) {
+					$history_map[$iid] = array_reverse($values);
+				}
 			}
 		}
 
@@ -261,14 +269,50 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 	// ── Metric extraction (now also stores itemid) ───────────────────────────
 
+	/**
+	 * Build the effective METRICS prefix map, merging class defaults with
+	 * any per-field overrides the user may have configured.
+	 */
+	private function buildMetricsPrefixMap(array $fields): array {
+		$overrides = [
+			'key_db_size'        => 'db_size',
+			'key_backends'       => 'backends',
+			'key_temp_bytes'     => 'temp_bytes_rate',
+			'key_commit_rate'    => 'commit_rate',
+			'key_rollback_rate'  => 'rollback_rate',
+			'key_deadlocks_rate' => 'deadlocks_rate',
+			'key_locks_total'    => 'locks_total',
+			'key_slow_queries'   => 'slow_queries',
+			'key_bloat'          => 'bloat',
+		];
+
+		$map = [];
+		foreach ($overrides as $field_name => $alias) {
+			// Get user-configured key or fall back to the class constant default
+			$default_prefix = array_search($alias, self::METRICS, true);
+			$prefix = trim((string) ($fields[$field_name] ?? $default_prefix));
+			if ($prefix === '') {
+				continue;
+			}
+			// The stored value has the trailing [ stripped (Zabbix macro-parser truncates
+			// values at [ when saving). Re-add it if not already present.
+			if (substr($prefix, -1) !== '[') {
+				$prefix .= '[';
+			}
+			$map[$prefix] = $alias;
+		}
+		return $map;
+	}
+
 	private function getMetricsByDatabase(array $items): array {
+		$prefix_map = $this->buildMetricsPrefixMap($this->fields_values);
 		$result = [];
 
 		foreach ($items as $item) {
 			$key = $item['key_'];
 			$metric_key = null;
 
-			foreach (self::METRICS as $prefix => $label) {
+			foreach ($prefix_map as $prefix => $label) {
 				if (strpos($key, $prefix) === 0) {
 					$metric_key = $label;
 					break;
@@ -290,9 +334,9 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 			$result[$db_name][$metric_key] = [
 				'itemid' => (string) $item['itemid'],
-				'label' => $item['name'],
-				'value' => $item['lastvalue'],
-				'units' => $item['units'],
+				'label'  => $item['name'],
+				'value'  => $item['lastvalue'],
+				'units'  => $item['units'],
 				'history' => []
 			];
 		}
@@ -300,32 +344,75 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $result;
 	}
 
+	/**
+	 * Build the effective cluster metrics maps, merging class defaults with
+	 * any per-field overrides the user may have configured.
+	 */
+	private function buildClusterMetricsMaps(array $fields): array {
+		// Exact-match overrides (no [ in these keys, no truncation issue)
+		$exact_overrides = [
+			'key_active_connections' => 'active_connections',
+			'key_wal_write'          => 'wal_write',
+			'key_wal_receive'        => 'wal_receive',
+			'key_wal_count'          => 'wal_count',
+			'key_cache_hit'          => 'cache_hit',
+		];
+		$exact_map = [];
+		foreach ($exact_overrides as $field_name => $alias) {
+			$default_key = array_search($alias, self::CLUSTER_METRICS, true);
+			$key = trim((string) ($fields[$field_name] ?? $default_key));
+			if ($key !== '') {
+				$exact_map[$key] = $alias;
+			}
+		}
+
+		// Prefix-match overrides (stored without trailing [, add it back)
+		$prefix_overrides = [
+			'key_replication_lag' => 'replication_lag',
+		];
+		$prefix_map = [];
+		foreach ($prefix_overrides as $field_name => $alias) {
+			$default_prefix = array_search($alias, self::CLUSTER_METRICS_PREFIX, true);
+			$prefix = trim((string) ($fields[$field_name] ?? $default_prefix));
+			if ($prefix === '') {
+				continue;
+			}
+			if (substr($prefix, -1) !== '[') {
+				$prefix .= '[';
+			}
+			$prefix_map[$prefix] = $alias;
+		}
+
+		return [$exact_map, $prefix_map];
+	}
+
 	private function getClusterMetrics(array $items): array {
+		[$exact_map, $prefix_map] = $this->buildClusterMetricsMaps($this->fields_values);
 		$result = [];
 
 		foreach ($items as $item) {
 			$key = $item['key_'];
 
 			// Exact match
-			if (array_key_exists($key, self::CLUSTER_METRICS)) {
-				$result[self::CLUSTER_METRICS[$key]] = [
+			if (array_key_exists($key, $exact_map)) {
+				$result[$exact_map[$key]] = [
 					'itemid' => (string) $item['itemid'],
-					'label' => $item['name'],
-					'value' => $item['lastvalue'],
-					'units' => $item['units'],
+					'label'  => $item['name'],
+					'value'  => $item['lastvalue'],
+					'units'  => $item['units'],
 					'history' => []
 				];
 				continue;
 			}
 
-			// Prefix match (e.g. replication lag has macro parameters in key)
-			foreach (self::CLUSTER_METRICS_PREFIX as $prefix => $alias) {
+			// Prefix match (replication lag has macro parameters in its key)
+			foreach ($prefix_map as $prefix => $alias) {
 				if (strpos($key, $prefix) === 0 && !array_key_exists($alias, $result)) {
 					$result[$alias] = [
 						'itemid' => (string) $item['itemid'],
-						'label' => $item['name'],
-						'value' => $item['lastvalue'],
-						'units' => $item['units'],
+						'label'  => $item['name'],
+						'value'  => $item['lastvalue'],
+						'units'  => $item['units'],
 						'history' => []
 					];
 					break;
@@ -411,7 +498,6 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'cpu_high_threshold' => 2.00,
 			'error' => $message,
 			'default_db' => '',
-			'show_optional' => true,
 			'icon_url' => $this->iconUrl(),
 			'user' => ['debug_mode' => $this->getDebugMode()]
 		]));

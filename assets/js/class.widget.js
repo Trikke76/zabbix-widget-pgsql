@@ -15,15 +15,14 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		var root = this._body.querySelector('.js-pgdb-widget');
 		if (!root) { return; }
 
-		var icon = root.querySelector('.pgdb-widget__icon');
-		if (icon && !icon.dataset.errorHandled) {
-			icon.dataset.errorHandled = '1';
-			icon.onerror = function() {
-				var fallback = icon.dataset.fallbackSrc;
-				if (fallback && icon.getAttribute('src') !== fallback) {
-					icon.setAttribute('src', fallback);
-				}
-			};
+		// Try to load PNG; if it exists swap it in, otherwise keep SVG
+		var icon = root.querySelector('.js-pgdb-icon');
+		if (icon && icon.dataset.pngSrc && !icon.dataset.pngChecked) {
+			icon.dataset.pngChecked = '1';
+			var probe = new Image();
+			probe.onload  = function() { icon.src = icon.dataset.pngSrc; };
+			probe.onerror = function() { /* keep SVG */ };
+			probe.src = icon.dataset.pngSrc;
 		}
 
 		var model = {};
@@ -119,7 +118,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			try {
 				var historyPts = (metric && Array.isArray(metric.history) && metric.history.length > 1)
 					? metric.history : null;
-				var svg = self._buildSparkline(historyPts, metric ? metric.value : null);
+				var svg = self._buildSparkline(historyPts, metric ? metric.value : null, spec.key);
 				row.appendChild(svg);
 			} catch (sparkErr) {
 				console.warn('[PgsqlClusterWidget] host sparkline failed for', spec.key, sparkErr);
@@ -235,7 +234,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 						? metric.history
 						: null;
 
-					var svg = self._buildSparkline(historyPts, metric ? metric.value : null);
+					var svg = self._buildSparkline(historyPts, metric ? metric.value : null, spec.key);
 					card.appendChild(svg);
 				} catch (sparkErr) {
 					console.warn('[PgsqlClusterWidget] sparkline failed for', spec.key, sparkErr);
@@ -269,22 +268,46 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 	 * @param {number[]|null} historyPts  Real history values (oldest→newest), or null for no-data state.
 	 * @param {*}             rawValue    The current lastvalue, used as the final point if history is sparse.
 	 */
-	_buildSparkline(historyPts, rawValue) {
+	/**
+	 * @param {number[]|null} historyPts  Raw history values oldest→newest, or null.
+	 * @param {*}             rawValue    Current lastvalue (used as final point).
+	 * @param {string}        metricKey   Used to apply per-metric normalization.
+	 */
+	_buildSparkline(historyPts, rawValue, metricKey) {
 		var W = 200, H = 36;
 		var ns  = 'http://www.w3.org/2000/svg';
 
 		var pts;
 
 		if (historyPts && historyPts.length >= 2) {
-			// Real data: use as-is, ensure last point equals current lastvalue when available
-			pts = historyPts.slice();
-			var currentVal = Number(rawValue);
-			if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal)) {
-				pts[pts.length - 1] = currentVal;
+			// Filter out sentinel "no data" values (negative values, NaN)
+			// that Zabbix sometimes stores when collection fails
+			pts = historyPts.filter(function(v) { return v >= 0 && isFinite(v); });
+
+			// If filtering left too few points, fall back to flat line
+			if (pts.length < 2) {
+				pts = [0, 0, 0, 0, 0];
+			} else {
+				// cache_hit: Zabbix stores raw ratio (0-1) but lastvalue may already be
+				// percentage (0-100). Normalize history to match the display unit.
+				if (metricKey === 'cache_hit') {
+					var lastRaw = Number(rawValue);
+					var histMax = Math.max.apply(null, pts);
+					if (histMax <= 1.0 && lastRaw > 1.0) {
+						pts = pts.map(function(v) { return v * 100; });
+					}
+					if (histMax > 1.0 && lastRaw <= 1.0 && lastRaw >= 0) {
+						rawValue = lastRaw * 100;
+					}
+				}
+
+				var currentVal = Number(rawValue);
+				if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal) && currentVal >= 0) {
+					pts[pts.length - 1] = currentVal;
+				}
 			}
 		} else {
-			// No history available: draw a flat zero line so the card still has a chart area
-			// but it's visually obvious there's no data (flat line at the bottom)
+			// No history: flat line at bottom
 			pts = [0, 0, 0, 0, 0];
 		}
 
@@ -295,20 +318,22 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			if (pts[i] > maxV) { maxV = pts[i]; }
 		}
 
-		var rng = maxV - minV;
-		// If all values are the same (flat line), draw it mid-height so it's clearly intentional
+		var rng  = maxV - minV;
 		var mg   = H * 0.10;
 		var useH = H - mg * 2;
 
+		// Clamp helper — Y coords must stay within [mg, H-mg] always
+		function cy(v) {
+			var raw = rng === 0 ? (H / 2) : (H - mg - ((v - minV) / rng) * useH);
+			return Math.max(mg, Math.min(H - mg, raw));
+		}
+
 		var coords = pts.map(function(v, idx) {
-			var xPos = (idx / (pts.length - 1)) * W;
-			var yPos = rng === 0
-				? (H / 2)  // flat: centre of chart
-				: (H - mg - ((v - minV) / rng) * useH);
-			return [xPos, yPos];
+			return [(idx / (pts.length - 1)) * W, cy(v)];
 		});
 
-		// Catmull-Rom → cubic bezier path
+		// Catmull-Rom → cubic bezier (smooth curves like CPU load sparklines).
+		// SVG overflow:hidden clips anything outside the viewBox.
 		var d = 'M ' + coords[0][0].toFixed(2) + ',' + coords[0][1].toFixed(2);
 		for (i = 0; i < coords.length - 1; i++) {
 			var p0 = coords[Math.max(i - 1, 0)];
@@ -323,12 +348,14 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		}
 
 		var last  = coords[coords.length - 1];
-		var areaD = d + ' L ' + last[0].toFixed(2) + ',' + H + ' L ' + coords[0][0].toFixed(2) + ',' + H + ' Z';
+		var baseline = (H - mg).toFixed(2);
+		var areaD = d + ' L ' + last[0].toFixed(2) + ',' + baseline + ' L ' + coords[0][0].toFixed(2) + ',' + baseline + ' Z';
 
 		var svg = document.createElementNS(ns, 'svg');
 		svg.setAttribute('class', 'pgdb-widget__sparkline');
 		svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 		svg.setAttribute('preserveAspectRatio', 'none');
+		svg.style.overflow = 'hidden';
 
 		var area = document.createElementNS(ns, 'path');
 		area.setAttribute('class', 'spark-area');
