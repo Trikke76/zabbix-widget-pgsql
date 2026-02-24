@@ -46,7 +46,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 					'error' => _('Select a host first.'),
 					'default_db' => $fields['default_db'] ?? '',
 					'show_optional' => $show_optional,
-					'icon_url' => 'modules/pgsql_cluster_widget/assets/img/postgres-icon-24.svg',
+					'icon_url' => $this->iconUrl(),
 					'user' => ['debug_mode' => $this->getDebugMode()]
 				]));
 				return;
@@ -128,7 +128,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 				'default_db' => $fields['default_db'] ?? '',
 				'show_optional' => $show_optional,
 				'error' => null,
-				'icon_url' => 'modules/pgsql_cluster_widget/assets/img/postgres-icon-24.svg',
+				'icon_url' => $this->iconUrl(),
 				'user' => ['debug_mode' => $this->getDebugMode()]
 			]));
 		}
@@ -363,6 +363,14 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $result;
 	}
 
+	// ── Helpers ─────────────────────────────────────────────────────────────
+
+	private function iconUrl(): string {
+		// Derive path from the actual module folder name so renaming the folder
+		// never requires touching this file.
+		return 'modules/' . basename(dirname(__DIR__)) . '/assets/img/postgres-icon-24.svg';
+	}
+
 	// ── Error response ───────────────────────────────────────────────────────
 
 	private function setErrorResponse(string $message): void {
@@ -379,7 +387,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'error' => $message,
 			'default_db' => '',
 			'show_optional' => true,
-			'icon_url' => 'modules/pgsql_cluster_widget/assets/img/postgres-icon-24.svg',
+			'icon_url' => $this->iconUrl(),
 			'user' => ['debug_mode' => $this->getDebugMode()]
 		]));
 	}

@@ -1,45 +1,78 @@
-# PostgreSQL Cluster Overview widget (Zabbix 7)
+# PostgreSQL Cluster Overview — Zabbix 7 Widget
 
-Custom widget om databases in een PostgreSQL cluster selecteerbaar te tonen met kernmetrics uit het officiele template `PostgreSQL by Zabbix agent 2`.
+A custom Zabbix dashboard widget that displays a selectable PostgreSQL cluster
+database overview with real-time metrics and sparklines, based on the official
+**PostgreSQL by Zabbix agent 2** template.
 
-![PGSQL widget](pgsql-widget.png)
+## What this widget does
 
-## Wat deze widget doet
-
-- Leest DB-lijst uit `pgsql.db.discovery[...]`.
-- Toont een dropdown met gevonden databases.
-- Toont per geselecteerde database:
+- Reads the database list from `pgsql.db.discovery[...]`
+- Shows a list of discovered databases with click-to-select buttons
+- Displays real sparklines (last 20 data points from Zabbix history) per metric
+- Shows per selected database:
   - Database size
-  - Backends connected
-  - Commits/s
-  - Rollbacks/s
-  - Locks total
-  - Deadlocks/s
-  - Slow queries (optioneel)
+  - Active backends
+  - Commits/s and Rollbacks/s
+  - Locks total and Deadlocks/s
+  - Temp bytes/s
+  - Slow queries
+- Shows cluster-wide metrics (active connections, WAL write/receive/count)
+- Shows host system metrics (CPU load avg1/5/15, memory total/available) with threshold-based color indicators
 
-## Structuur
+## Requirements
 
-- `zabbix-widget-pgsql/manifest.json`
-- `zabbix-widget-pgsql/Widget.php`
-- `zabbix-widget-pgsql/actions/WidgetView.php`
-- `zabbix-widget-pgsql/includes/WidgetForm.php`
-- `zabbix-widget-pgsql/views/widget.view.php`
-- `zabbix-widget-pgsql/views/widget.edit.php`
-- `zabbix-widget-pgsql/assets/js/class.widget.js`
-- `zabbix-widget-pgsql/assets/css/widget.css`
-- `zabbix-widget-pgsql/assets/img/postgres-icon-24.svg`
+- Zabbix 7.0 but will probably also work on 7.x
+- Host monitored with the **PostgreSQL by Zabbix agent 2** template
 
-## Installatie
+## Installation
 
-1. Kopieer de map `zabbix-widget-pgsql` naar je Zabbix frontend modules map, meestal:
-   - `/usr/share/zabbix/modules/`
-2. Herstart webserver/php-fpm indien nodig.
-3. In Zabbix: `Administration -> General -> Modules` en activeer `PostgreSQL Cluster Overview`.
-4. Voeg widget toe op een dashboard.
-5. Kies in widget-instellingen het `Database discovery item` (item key `pgsql.db.discovery[...]`).
+Clone the repository directly into the Zabbix modules directory:
 
-## Notities
+```bash
+cd /usr/share/zabbix/modules or modules/ui/
+git clone https://github.com/your-org/your-repo.git zabbix-widget-pgsql
+```
 
-- De widget verwacht dat de host al gekoppeld is aan template `PostgreSQL by Zabbix agent 2`.
-- Als discovery nog geen recente waarde heeft, valt de widget terug op item-keys die al bestaan op de host.
-- Als je je eigen icoon wilt gebruiken, plaats `postgres-icon-24.png` in `assets/img/` en pas het pad aan in `actions/WidgetView.php`.
+Then activate the module in Zabbix:
+
+1. Go to **Administration → General → Modules**
+2. Click **Scan directory**
+3. Enable **PostgreSQL Cluster Overview**
+4. Add the widget to any dashboard and select your PostgreSQL host
+
+## Updating
+
+```bash
+cd /usr/share/zabbix/modules/zabbix-widget-pgsql
+git pull
+```
+
+Reload your browser after updating to clear any cached JavaScript.
+
+## File structure
+
+```
+zabbix-widget-pgsql/
+├── manifest.json
+├── Widget.php
+├── actions/
+│   └── WidgetView.php
+├── includes/
+│   └── WidgetForm.php
+├── views/
+│   ├── widget.view.php
+│   └── widget.edit.php
+└── assets/
+    ├── js/
+    │   └── class.widget.js
+    ├── css/
+    │   └── widget.css
+    └── img/
+        └── postgres-icon-24.svg
+```
+
+## Notes
+
+- If the discovery rule has not yet collected data, the widget falls back to metric keys already present on the host.
+- Asset paths are derived dynamically from the module folder name, so renaming the clone directory does not require any code changes.
+- To use a custom icon, place `postgres-icon-24.png` in `assets/img/`. The widget will prefer the `.png` and fall back to the `.svg` automatically.

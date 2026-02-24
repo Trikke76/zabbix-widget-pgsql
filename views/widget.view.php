@@ -4,6 +4,11 @@ declare(strict_types = 1);
 
 /** @var array $data */
 
+// Derive the asset base path from the module's own directory name,
+// so this never needs to be changed when the module folder is renamed.
+$module_dir = basename(dirname(__DIR__));
+$asset_base  = 'modules/' . $module_dir . '/assets';
+
 $payload = [
 	'databases' => $data['databases'] ?? [],
 	'cluster_metrics' => $data['cluster_metrics'] ?? [],
@@ -16,7 +21,7 @@ $payload = [
 	'default_db' => $data['default_db'] ?? '',
 	'show_optional' => (bool) ($data['show_optional'] ?? true),
 	'error' => $data['error'] ?? null,
-	'icon_url' => $data['icon_url'] ?? 'modules/pgsql_cluster_widget/assets/img/postgres-icon-24.svg'
+	'icon_url' => $asset_base . '/img/postgres-icon-24.svg'
 ];
 
 $root = (new CDiv())
@@ -25,10 +30,9 @@ $root = (new CDiv())
 
 $header = (new CDiv())->addClass('pgdb-widget__header');
 $visual = (new CDiv())->addClass('pgdb-widget__visual');
-$primary_icon = 'modules/pgsql_cluster_widget/assets/img/postgres-icon-24.png';
 $icon = (new CTag('img'))
 	->addClass('pgdb-widget__icon')
-	->setAttribute('src', $primary_icon)
+	->setAttribute('src', $asset_base . '/img/postgres-icon-24.png')
 	->setAttribute('data-fallback-src', $payload['icon_url'])
 	->setAttribute('alt', 'PostgreSQL')
 	->setAttribute('loading', 'lazy');
