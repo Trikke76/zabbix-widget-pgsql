@@ -265,111 +265,137 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 	/**
 	 * Build a sparkline SVG.
 	 *
-	 * @param {number[]|null} historyPts  Real history values (oldest→newest), or null for no-data state.
-	 * @param {*}             rawValue    The current lastvalue, used as the final point if history is sparse.
-	 */
-	/**
+	 * Y-axis is ALWAYS anchored at 0 (bottom = 0, top = maxValue).
+	 * This guarantees that data values >= 0 never render below the baseline.
+	 * A SVG <clipPath> is used as a hard safety net to prevent any pixel from
+	 * escaping the viewBox regardless of floating-point arithmetic.
+	 *
 	 * @param {number[]|null} historyPts  Raw history values oldest→newest, or null.
-	 * @param {*}             rawValue    Current lastvalue (used as final point).
-	 * @param {string}        metricKey   Used to apply per-metric normalization.
+	 * @param {*}             rawValue    Current lastvalue (replaces last history point).
+	 * @param {string}        metricKey   Used to apply per-metric normalization (e.g. cache_hit).
 	 */
 	_buildSparkline(historyPts, rawValue, metricKey) {
 		var W = 200, H = 36;
 		var ns = 'http://www.w3.org/2000/svg';
 
+		// ── 1. Build the points array ─────────────────────────────────────────
 		var pts;
 
 		if (historyPts && historyPts.length >= 2) {
-			// Filter out sentinel "no data" values (negative values, NaN)
-			// that Zabbix sometimes stores when collection fails
+			// Drop any negative / non-finite sentinel values Zabbix may store.
 			pts = historyPts.filter(function (v) { return v >= 0 && isFinite(v); });
 
-			// If filtering left too few points, fall back to flat line
 			if (pts.length < 2) {
 				pts = [0, 0, 0, 0, 0];
 			} else {
-				// cache_hit: Zabbix stores raw ratio (0-1) but lastvalue may already be
-				// percentage (0-100). Normalize history to match the display unit.
+				// cache_hit normalisation: Zabbix may store 0-1 ratio while display
+				// shows 0-100 %, or vice-versa. Make history consistent with lastvalue.
 				if (metricKey === 'cache_hit') {
 					var lastRaw = Number(rawValue);
 					var histMax = Math.max.apply(null, pts);
 					if (histMax <= 1.0 && lastRaw > 1.0) {
 						pts = pts.map(function (v) { return v * 100; });
-					}
-					if (histMax > 1.0 && lastRaw <= 1.0 && lastRaw >= 0) {
+					} else if (histMax > 1.0 && lastRaw >= 0 && lastRaw <= 1.0) {
 						rawValue = lastRaw * 100;
 					}
 				}
 
+				// Replace last history point with the current live value.
 				var currentVal = Number(rawValue);
 				if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal) && currentVal >= 0) {
 					pts[pts.length - 1] = currentVal;
 				}
 			}
 		} else {
-			// No history: flat line at bottom
+			// No usable history → flat line at baseline.
 			pts = [0, 0, 0, 0, 0];
 		}
 
-		// Normalise to canvas coordinates
-		var minV = pts[0], maxV = pts[0];
-		for (var i = 1; i < pts.length; i++) {
-			if (pts[i] < minV) { minV = pts[i]; }
+		// ── 2. Compute Y scale anchored at 0 ─────────────────────────────────
+		// maxV is the highest value; the baseline is always 0.
+		// This means values >= 0 can NEVER be plotted below the canvas bottom.
+		var maxV = 0;
+		for (var i = 0; i < pts.length; i++) {
 			if (pts[i] > maxV) { maxV = pts[i]; }
 		}
 
-		var rng = maxV - minV;
-		var mg = H * 0.10;
-		var useH = H - mg * 2;
+		// Small top/bottom padding so the line and dot never touch the SVG edge.
+		var padTop = H * 0.12;   // pixels reserved at top
+		var padBot = H * 0.08;   // pixels reserved at bottom (above the visual baseline)
+		var drawH = H - padTop - padBot; // usable drawing height
 
-		// Clamp helper — Y coords must stay within [mg, H-mg] always
+		// Map a value to a Y coordinate.
+		// value=0      → Y = H - padBot  (bottom of drawing area)
+		// value=maxV   → Y = padTop       (top of drawing area)
 		function cy(v) {
-			var raw = rng === 0 ? (H / 2) : (H - mg - ((v - minV) / rng) * useH);
-			return Math.max(mg, Math.min(H - mg, raw));
+			if (maxV === 0) {
+				// All values are 0: flat line sits on the baseline.
+				return H - padBot;
+			}
+			var frac = Math.max(0, Math.min(1, v / maxV));
+			return padTop + (1 - frac) * drawH;
 		}
 
+		// ── 3. Compute canvas X/Y for every point ────────────────────────────
+		var n = pts.length;
 		var coords = pts.map(function (v, idx) {
-			return [(idx / (pts.length - 1)) * W, cy(v)];
+			return [(idx / (n - 1)) * W, cy(v)];
 		});
 
-		// Catmull-Rom → cubic bezier (smooth curves like CPU load sparklines).
-		// SVG overflow:hidden clips anything outside the viewBox.
+		// ── 4. Build SVG path using straight line segments ───────────────────
+		// Straight lines cannot overshoot; they are the only option that is
+		// 100 % guaranteed to stay within [padTop, H-padBot].
 		var d = 'M ' + coords[0][0].toFixed(2) + ',' + coords[0][1].toFixed(2);
-		for (i = 0; i < coords.length - 1; i++) {
-			var p0 = coords[Math.max(i - 1, 0)];
-			var p1 = coords[i];
-			var p2 = coords[i + 1];
-			var p3 = coords[Math.min(i + 2, coords.length - 1)];
-			var cp1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2);
-			var cp1y = Math.max(mg, Math.min(H - mg, p1[1] + (p2[1] - p0[1]) / 6)).toFixed(2);
-			var cp2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2);
-			var cp2y = Math.max(mg, Math.min(H - mg, p2[1] - (p3[1] - p1[1]) / 6)).toFixed(2);
-			d += ' C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
+		for (i = 1; i < coords.length; i++) {
+			d += ' L ' + coords[i][0].toFixed(2) + ',' + coords[i][1].toFixed(2);
 		}
 
+		// Filled area: close the path down to the visual baseline and back.
+		var baselineY = (H - padBot).toFixed(2);
 		var last = coords[coords.length - 1];
-		var baseline = (H - mg).toFixed(2);
-		var areaD = d + ' L ' + last[0].toFixed(2) + ',' + baseline + ' L ' + coords[0][0].toFixed(2) + ',' + baseline + ' Z';
+		var areaD = d
+			+ ' L ' + last[0].toFixed(2) + ',' + baselineY
+			+ ' L ' + coords[0][0].toFixed(2) + ',' + baselineY
+			+ ' Z';
 
+		// ── 5. Build the SVG element with a clipPath safety net ──────────────
 		var svg = document.createElementNS(ns, 'svg');
 		svg.setAttribute('class', 'pgdb-widget__sparkline');
 		svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 		svg.setAttribute('preserveAspectRatio', 'none');
 		svg.style.overflow = 'hidden';
 
+		// clipPath guarantees nothing can escape the viewBox, even due to
+		// floating-point rounding or future code changes.
+		var clipId = 'spark-clip-' + Math.random().toString(36).slice(2);
+		var defs = document.createElementNS(ns, 'defs');
+		var clip = document.createElementNS(ns, 'clipPath');
+		clip.setAttribute('id', clipId);
+		var clipRect = document.createElementNS(ns, 'rect');
+		clipRect.setAttribute('x', '0');
+		clipRect.setAttribute('y', '0');
+		clipRect.setAttribute('width', String(W));
+		clipRect.setAttribute('height', String(H));
+		clip.appendChild(clipRect);
+		defs.appendChild(clip);
+		svg.appendChild(defs);
+
 		var area = document.createElementNS(ns, 'path');
 		area.setAttribute('class', 'spark-area');
 		area.setAttribute('d', areaD);
+		area.setAttribute('clip-path', 'url(#' + clipId + ')');
 
 		var line = document.createElementNS(ns, 'path');
 		line.setAttribute('class', 'spark-line');
 		line.setAttribute('d', d);
+		line.setAttribute('clip-path', 'url(#' + clipId + ')');
 
 		var dot = document.createElementNS(ns, 'circle');
 		dot.setAttribute('class', 'spark-dot');
 		dot.setAttribute('cx', last[0].toFixed(2));
 		dot.setAttribute('cy', last[1].toFixed(2));
 		dot.setAttribute('r', '2.5');
+		dot.setAttribute('clip-path', 'url(#' + clipId + ')');
 
 		svg.appendChild(area);
 		svg.appendChild(line);
