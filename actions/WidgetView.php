@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Modules\PgsqlClusterWidget\Actions;
 
@@ -8,7 +8,8 @@ use API;
 use CControllerDashboardWidgetView;
 use CControllerResponseData;
 
-class WidgetView extends CControllerDashboardWidgetView {
+class WidgetView extends CControllerDashboardWidgetView
+{
 
 	private const HISTORY_LIMIT = 20;
 
@@ -40,7 +41,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 		'pgsql.replication.lag.sec[' => 'replication_lag'
 	];
 
-	protected function doAction(): void {
+	protected function doAction(): void
+	{
 		try {
 			$fields = $this->fields_values;
 			$cpu_warn_threshold = $this->toFloat($fields['cpu_warn_threshold'] ?? 1.00, 1.00);
@@ -68,8 +70,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 				]);
 
 				if ($discovery_item) {
-					$hostid = (string) $discovery_item[0]['hostid'];
-					$discovery_itemid = (string) $discovery_item[0]['itemid'];
+					$hostid = (string)$discovery_item[0]['hostid'];
+					$discovery_itemid = (string)$discovery_item[0]['itemid'];
 				}
 				else {
 					$discovery_itemid = null;
@@ -111,12 +113,12 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 			// Attach history to metrics
 			$cluster_metrics = $this->attachHistory($cluster_metrics, $history_map);
-			$host_metrics    = $this->attachHistory($host_metrics, $history_map);
+			$host_metrics = $this->attachHistory($host_metrics, $history_map);
 
 			$databases = [];
 			foreach ($discovered_db_names as $db_name) {
 				$db_metrics = $metrics_by_db[$db_name] ?? [];
-				$db_metrics  = $this->attachHistory($db_metrics, $history_map);
+				$db_metrics = $this->attachHistory($db_metrics, $history_map);
 				$databases[] = [
 					'name' => $db_name,
 					'metrics' => $db_metrics
@@ -146,7 +148,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 	// ── Item fetching ────────────────────────────────────────────────────────
 
-	private function fetchAllItems(string $hostid): array {
+	private function fetchAllItems(string $hostid): array
+	{
 		return API::Item()->get([
 			'output' => ['itemid', 'name', 'key_', 'units', 'lastvalue', 'value_type'],
 			'hostids' => [$hostid],
@@ -165,11 +168,12 @@ class WidgetView extends CControllerDashboardWidgetView {
 		array $cluster_metrics,
 		array $host_metrics,
 		array $metrics_by_db
-	): array {
+		): array
+	{
 		// Build a map of itemid => value_type from the full item list
 		$item_vtypes = [];
 		foreach ($all_items as $item) {
-			$item_vtypes[(string) $item['itemid']] = (int) $item['value_type'];
+			$item_vtypes[(string)$item['itemid']] = (int)$item['value_type'];
 		}
 
 		$result = [];
@@ -179,7 +183,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 				if (!isset($metric['itemid'])) {
 					continue;
 				}
-				$iid = (string) $metric['itemid'];
+				$iid = (string)$metric['itemid'];
 				if (array_key_exists($iid, $item_vtypes)) {
 					$result[$iid] = $item_vtypes[$iid];
 				}
@@ -195,58 +199,36 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $result;
 	}
 
-	/**
-	 * Bulk fetch history for a set of item IDs.
-	 * Returns [ itemid => [ float, float, ... ] ] (oldest → newest, max HISTORY_LIMIT points).
-	 *
-	 * Fetches newest-first in batches of 10 to guarantee HISTORY_LIMIT points
-	 * per item regardless of how many total items are queried at once.
-	 *
-	 * Zabbix history types: 0 = float, 3 = uint
-	 */
-	private function fetchHistoryBulk(array $itemid_vtype_map): array {
+	private function fetchHistoryBulk(array $itemid_vtype_map): array
+	{
 		if (!$itemid_vtype_map) {
 			return [];
 		}
 
-		// Group by value_type
-		$by_type = [];
-		foreach ($itemid_vtype_map as $itemid => $vtype) {
-			if ($vtype === \ITEM_VALUE_TYPE_FLOAT || $vtype === \ITEM_VALUE_TYPE_UINT64) {
-				$by_type[$vtype][] = $itemid;
-			}
-		}
-
 		$history_map = [];
 
-		foreach ($by_type as $vtype => $itemids) {
-			// Batch items in chunks of 10 so the limit covers all items in the chunk
-			$chunks = array_chunk($itemids, 10);
+		foreach ($itemid_vtype_map as $itemid => $vtype) {
+			if ($vtype !== \ITEM_VALUE_TYPE_FLOAT && $vtype !== \ITEM_VALUE_TYPE_UINT64) {
+				continue;
+			}
 
-			foreach ($chunks as $chunk) {
-				$rows = API::History()->get([
-					'output'    => ['itemid', 'value'],
-					'history'   => $vtype,
-					'itemids'   => $chunk,
-					'sortfield' => 'clock',
-					'sortorder' => \ZBX_SORT_DOWN,
-					'limit'     => count($chunk) * self::HISTORY_LIMIT
-				]);
+			// Fetch history individually per item to ensure self::HISTORY_LIMIT points per item.
+			// Zabbix history.get limit is global across all itemids.
+			$rows = API::History()->get([
+				'output' => ['itemid', 'value'],
+				'history' => $vtype,
+				'itemids' => [$itemid],
+				'sortfield' => 'clock',
+				'sortorder' => \ZBX_SORT_DOWN,
+				'limit' => self::HISTORY_LIMIT
+			]);
 
-				// Group by itemid, cap at HISTORY_LIMIT, then reverse to oldest→newest
-				$grouped = [];
+			if ($rows) {
+				$values = [];
 				foreach ($rows as $row) {
-					$iid = (string) $row['itemid'];
-					if (!isset($grouped[$iid])) {
-						$grouped[$iid] = [];
-					}
-					if (count($grouped[$iid]) < self::HISTORY_LIMIT) {
-						$grouped[$iid][] = (float) $row['value'];
-					}
+					$values[] = (float)$row['value'];
 				}
-				foreach ($grouped as $iid => $values) {
-					$history_map[$iid] = array_reverse($values);
-				}
+				$history_map[$itemid] = array_reverse($values);
 			}
 		}
 
@@ -256,12 +238,13 @@ class WidgetView extends CControllerDashboardWidgetView {
 	/**
 	 * Attach the history array to each metric that has an itemid.
 	 */
-	private function attachHistory(array $metrics, array $history_map): array {
+	private function attachHistory(array $metrics, array $history_map): array
+	{
 		foreach ($metrics as $key => $metric) {
 			if (!isset($metric['itemid'])) {
 				continue;
 			}
-			$iid = (string) $metric['itemid'];
+			$iid = (string)$metric['itemid'];
 			$metrics[$key]['history'] = $history_map[$iid] ?? [];
 		}
 		return $metrics;
@@ -273,24 +256,25 @@ class WidgetView extends CControllerDashboardWidgetView {
 	 * Build the effective METRICS prefix map, merging class defaults with
 	 * any per-field overrides the user may have configured.
 	 */
-	private function buildMetricsPrefixMap(array $fields): array {
+	private function buildMetricsPrefixMap(array $fields): array
+	{
 		$overrides = [
-			'key_db_size'        => 'db_size',
-			'key_backends'       => 'backends',
-			'key_temp_bytes'     => 'temp_bytes_rate',
-			'key_commit_rate'    => 'commit_rate',
-			'key_rollback_rate'  => 'rollback_rate',
+			'key_db_size' => 'db_size',
+			'key_backends' => 'backends',
+			'key_temp_bytes' => 'temp_bytes_rate',
+			'key_commit_rate' => 'commit_rate',
+			'key_rollback_rate' => 'rollback_rate',
 			'key_deadlocks_rate' => 'deadlocks_rate',
-			'key_locks_total'    => 'locks_total',
-			'key_slow_queries'   => 'slow_queries',
-			'key_bloat'          => 'bloat',
+			'key_locks_total' => 'locks_total',
+			'key_slow_queries' => 'slow_queries',
+			'key_bloat' => 'bloat',
 		];
 
 		$map = [];
 		foreach ($overrides as $field_name => $alias) {
 			// Get user-configured key or fall back to the class constant default
 			$default_prefix = array_search($alias, self::METRICS, true);
-			$prefix = trim((string) ($fields[$field_name] ?? $default_prefix));
+			$prefix = trim((string)($fields[$field_name] ?? $default_prefix));
 			if ($prefix === '') {
 				continue;
 			}
@@ -304,7 +288,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $map;
 	}
 
-	private function getMetricsByDatabase(array $items): array {
+	private function getMetricsByDatabase(array $items): array
+	{
 		$prefix_map = $this->buildMetricsPrefixMap($this->fields_values);
 		$result = [];
 
@@ -333,10 +318,10 @@ class WidgetView extends CControllerDashboardWidgetView {
 			}
 
 			$result[$db_name][$metric_key] = [
-				'itemid' => (string) $item['itemid'],
-				'label'  => $item['name'],
-				'value'  => $item['lastvalue'],
-				'units'  => $item['units'],
+				'itemid' => (string)$item['itemid'],
+				'label' => $item['name'],
+				'value' => $item['lastvalue'],
+				'units' => $item['units'],
 				'history' => []
 			];
 		}
@@ -348,19 +333,20 @@ class WidgetView extends CControllerDashboardWidgetView {
 	 * Build the effective cluster metrics maps, merging class defaults with
 	 * any per-field overrides the user may have configured.
 	 */
-	private function buildClusterMetricsMaps(array $fields): array {
+	private function buildClusterMetricsMaps(array $fields): array
+	{
 		// Exact-match overrides (no [ in these keys, no truncation issue)
 		$exact_overrides = [
 			'key_active_connections' => 'active_connections',
-			'key_wal_write'          => 'wal_write',
-			'key_wal_receive'        => 'wal_receive',
-			'key_wal_count'          => 'wal_count',
-			'key_cache_hit'          => 'cache_hit',
+			'key_wal_write' => 'wal_write',
+			'key_wal_receive' => 'wal_receive',
+			'key_wal_count' => 'wal_count',
+			'key_cache_hit' => 'cache_hit',
 		];
 		$exact_map = [];
 		foreach ($exact_overrides as $field_name => $alias) {
 			$default_key = array_search($alias, self::CLUSTER_METRICS, true);
-			$key = trim((string) ($fields[$field_name] ?? $default_key));
+			$key = trim((string)($fields[$field_name] ?? $default_key));
 			if ($key !== '') {
 				$exact_map[$key] = $alias;
 			}
@@ -373,7 +359,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$prefix_map = [];
 		foreach ($prefix_overrides as $field_name => $alias) {
 			$default_prefix = array_search($alias, self::CLUSTER_METRICS_PREFIX, true);
-			$prefix = trim((string) ($fields[$field_name] ?? $default_prefix));
+			$prefix = trim((string)($fields[$field_name] ?? $default_prefix));
 			if ($prefix === '') {
 				continue;
 			}
@@ -386,7 +372,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return [$exact_map, $prefix_map];
 	}
 
-	private function getClusterMetrics(array $items): array {
+	private function getClusterMetrics(array $items): array
+	{
 		[$exact_map, $prefix_map] = $this->buildClusterMetricsMaps($this->fields_values);
 		$result = [];
 
@@ -396,10 +383,10 @@ class WidgetView extends CControllerDashboardWidgetView {
 			// Exact match
 			if (array_key_exists($key, $exact_map)) {
 				$result[$exact_map[$key]] = [
-					'itemid' => (string) $item['itemid'],
-					'label'  => $item['name'],
-					'value'  => $item['lastvalue'],
-					'units'  => $item['units'],
+					'itemid' => (string)$item['itemid'],
+					'label' => $item['name'],
+					'value' => $item['lastvalue'],
+					'units' => $item['units'],
 					'history' => []
 				];
 				continue;
@@ -409,10 +396,10 @@ class WidgetView extends CControllerDashboardWidgetView {
 			foreach ($prefix_map as $prefix => $alias) {
 				if (strpos($key, $prefix) === 0 && !array_key_exists($alias, $result)) {
 					$result[$alias] = [
-						'itemid' => (string) $item['itemid'],
-						'label'  => $item['name'],
-						'value'  => $item['lastvalue'],
-						'units'  => $item['units'],
+						'itemid' => (string)$item['itemid'],
+						'label' => $item['name'],
+						'value' => $item['lastvalue'],
+						'units' => $item['units'],
 						'history' => []
 					];
 					break;
@@ -423,7 +410,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $result;
 	}
 
-	private function getHostMetrics(array $items, array $fields): array {
+	private function getHostMetrics(array $items, array $fields): array
+	{
 		$config = [
 			'host_cpu_load_avg1_key' => [
 				'default_key' => 'system.cpu.load[all,avg1]',
@@ -449,7 +437,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 		$key_to_alias = [];
 		foreach ($config as $field_name => $row) {
-			$key = trim((string) ($fields[$field_name] ?? $row['default_key']));
+			$key = trim((string)($fields[$field_name] ?? $row['default_key']));
 			if ($key !== '') {
 				$key_to_alias[$key] = $field_name;
 			}
@@ -464,7 +452,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 			$alias = $key_to_alias[$key];
 			$result[$alias] = [
-				'itemid' => (string) $item['itemid'],
+				'itemid' => (string)$item['itemid'],
 				'label' => $config[$alias]['label'],
 				'value' => $item['lastvalue'],
 				'units' => $item['units'],
@@ -477,7 +465,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 	// ── Helpers ─────────────────────────────────────────────────────────────
 
-	private function iconUrl(): string {
+	private function iconUrl(): string
+	{
 		// Derive path from the actual module folder name so renaming the folder
 		// never requires touching this file.
 		return 'modules/' . basename(dirname(__DIR__)) . '/assets/img/postgres-icon-24.svg';
@@ -485,7 +474,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 	// ── Error response ───────────────────────────────────────────────────────
 
-	private function setErrorResponse(string $message): void {
+	private function setErrorResponse(string $message): void
+	{
 		$this->setResponse(new CControllerResponseData([
 			'name' => $this->widget->getDefaultName(),
 			'databases' => [],
@@ -505,7 +495,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 	// ── Discovery ────────────────────────────────────────────────────────────
 
-	private function findDiscoveryItemIdByHost(string $hostid): ?string {
+	private function findDiscoveryItemIdByHost(string $hostid): ?string
+	{
 		$rules = API::DiscoveryRule()->get([
 			'output' => ['itemid', 'key_'],
 			'hostids' => [$hostid],
@@ -517,10 +508,11 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'inherited' => true
 		]);
 
-		return $rules ? (string) $rules[0]['itemid'] : null;
+		return $rules ? (string)$rules[0]['itemid'] : null;
 	}
 
-	private function getDiscoveredDatabases(string $discovery_itemid): array {
+	private function getDiscoveredDatabases(string $discovery_itemid): array
+	{
 		$history = API::History()->get([
 			'output' => ['value'],
 			'history' => \ITEM_VALUE_TYPE_TEXT,
@@ -547,7 +539,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$db_names = [];
 		foreach ($rows as $row) {
 			if (is_array($row) && array_key_exists('{#DBNAME}', $row) && $row['{#DBNAME}'] !== '') {
-				$db_names[] = (string) $row['{#DBNAME}'];
+				$db_names[] = (string)$row['{#DBNAME}'];
 			}
 		}
 
@@ -559,7 +551,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 	// ── Visibility ───────────────────────────────────────────────────────────
 
-	private function buildVisibility(array $fields): array {
+	private function buildVisibility(array $fields): array
+	{
 		$keys = [
 			'show_host_cpu_avg1', 'show_host_cpu_avg5', 'show_host_cpu_avg15',
 			'show_host_mem_total', 'show_host_mem_available',
@@ -578,23 +571,24 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $result;
 	}
 
-	private function buildVisibleMetricKeys(array $visibility): array {
+	private function buildVisibleMetricKeys(array $visibility): array
+	{
 		$map = [
 			'active_connections' => 'show_active_connections',
-			'wal_write'          => 'show_wal_write',
-			'wal_receive'        => 'show_wal_receive',
-			'wal_count'          => 'show_wal_count',
-			'db_size'            => 'show_db_size',
-			'backends'           => 'show_backends',
-			'temp_bytes_rate'    => 'show_temp_bytes',
-			'commit_rate'        => 'show_commit_rate',
-			'rollback_rate'      => 'show_rollback_rate',
-			'locks_total'        => 'show_locks_total',
-			'deadlocks_rate'     => 'show_deadlocks_rate',
-			'slow_queries'       => 'show_slow_queries',
-			'cache_hit'          => 'show_cache_hit',
-			'replication_lag'    => 'show_replication_lag',
-			'bloat'              => 'show_bloat'
+			'wal_write' => 'show_wal_write',
+			'wal_receive' => 'show_wal_receive',
+			'wal_count' => 'show_wal_count',
+			'db_size' => 'show_db_size',
+			'backends' => 'show_backends',
+			'temp_bytes_rate' => 'show_temp_bytes',
+			'commit_rate' => 'show_commit_rate',
+			'rollback_rate' => 'show_rollback_rate',
+			'locks_total' => 'show_locks_total',
+			'deadlocks_rate' => 'show_deadlocks_rate',
+			'slow_queries' => 'show_slow_queries',
+			'cache_hit' => 'show_cache_hit',
+			'replication_lag' => 'show_replication_lag',
+			'bloat' => 'show_bloat'
 		];
 
 		$result = [];
@@ -607,13 +601,14 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $result;
 	}
 
-	private function buildVisibleHostMetricKeys(array $visibility): array {
+	private function buildVisibleHostMetricKeys(array $visibility): array
+	{
 		$map = [
-			'host_cpu_load_avg1_key'   => 'show_host_cpu_avg1',
-			'host_cpu_load_avg5_key'   => 'show_host_cpu_avg5',
-			'host_cpu_load_avg15_key'  => 'show_host_cpu_avg15',
-			'host_memory_total_key'    => 'show_host_mem_total',
-			'host_memory_available_key'=> 'show_host_mem_available'
+			'host_cpu_load_avg1_key' => 'show_host_cpu_avg1',
+			'host_cpu_load_avg5_key' => 'show_host_cpu_avg5',
+			'host_cpu_load_avg15_key' => 'show_host_cpu_avg15',
+			'host_memory_total_key' => 'show_host_mem_total',
+			'host_memory_available_key' => 'show_host_mem_available'
 		];
 
 		$result = [];
@@ -628,41 +623,44 @@ class WidgetView extends CControllerDashboardWidgetView {
 
 	// ── Helpers ──────────────────────────────────────────────────────────────
 
-	private function extractItemId($value): ?string {
+	private function extractItemId($value): ?string
+	{
 		if (is_array($value) && $value) {
 			$first = reset($value);
 			if (is_array($first) && array_key_exists('itemid', $first)) {
-				return (string) $first['itemid'];
+				return (string)$first['itemid'];
 			}
-			return (string) $first;
+			return (string)$first;
 		}
 
-		if (is_scalar($value) && (string) $value !== '') {
-			$itemid = trim((string) $value);
+		if (is_scalar($value) && (string)$value !== '') {
+			$itemid = trim((string)$value);
 			return $itemid !== '' ? $itemid : null;
 		}
 
 		return null;
 	}
 
-	private function extractHostId($value): ?string {
+	private function extractHostId($value): ?string
+	{
 		if (is_array($value) && $value) {
 			$first = reset($value);
 			if (is_array($first) && array_key_exists('hostid', $first)) {
-				return (string) $first['hostid'];
+				return (string)$first['hostid'];
 			}
-			return (string) $first;
+			return (string)$first;
 		}
 
-		if (is_scalar($value) && (string) $value !== '') {
-			$hostid = trim((string) $value);
+		if (is_scalar($value) && (string)$value !== '') {
+			$hostid = trim((string)$value);
 			return $hostid !== '' ? $hostid : null;
 		}
 
 		return null;
 	}
 
-	private function extractDbName(string $item_key): ?string {
+	private function extractDbName(string $item_key): ?string
+	{
 		if (preg_match('/"([^"]+)"\]$/', $item_key, $matches) !== 1) {
 			return null;
 		}
@@ -670,7 +668,8 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return $matches[1] !== '' ? $matches[1] : null;
 	}
 
-	private function toBool($value, bool $default): bool {
+	private function toBool($value, bool $default): bool
+	{
 		$normalized = $this->normalizeScalar($value);
 		if ($normalized === null || $normalized === '') {
 			return $default;
@@ -680,16 +679,18 @@ class WidgetView extends CControllerDashboardWidgetView {
 		return in_array($v, ['1', 'true', 'yes', 'on'], true);
 	}
 
-	private function toFloat($value, float $default): float {
+	private function toFloat($value, float $default): float
+	{
 		$normalized = $this->normalizeScalar($value);
 		if ($normalized === null || $normalized === '') {
 			return $default;
 		}
 
-		return is_numeric($normalized) ? (float) $normalized : $default;
+		return is_numeric($normalized) ? (float)$normalized : $default;
 	}
 
-	private function normalizeScalar($value): ?string {
+	private function normalizeScalar($value): ?string
+	{
 		if (is_bool($value)) {
 			return $value ? '1' : '0';
 		}
@@ -700,7 +701,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 				if (is_bool($nested)) {
 					return $nested ? '1' : '0';
 				}
-				return is_scalar($nested) ? (string) $nested : null;
+				return is_scalar($nested) ? (string)$nested : null;
 			}
 
 			$first = reset($value);
@@ -710,7 +711,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 					return $nested ? '1' : '0';
 				}
 				if (is_scalar($nested)) {
-					return (string) $nested;
+					return (string)$nested;
 				}
 			}
 
@@ -718,9 +719,9 @@ class WidgetView extends CControllerDashboardWidgetView {
 				return $first ? '1' : '0';
 			}
 
-			return is_scalar($first) ? (string) $first : null;
+			return is_scalar($first) ? (string)$first : null;
 		}
 
-		return is_scalar($value) ? (string) $value : null;
+		return is_scalar($value) ? (string)$value : null;
 	}
 }
