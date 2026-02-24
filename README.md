@@ -4,6 +4,8 @@ A custom Zabbix dashboard widget that displays a selectable PostgreSQL cluster
 database overview with real-time metrics and sparklines, based on the official
 **PostgreSQL by Zabbix agent 2** template.
 
+![PGSQL Widget](pgsql-widget.png)
+
 ## What this widget does
 
 - Reads the database list from `pgsql.db.discovery[...]`
