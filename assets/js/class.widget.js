@@ -20,8 +20,8 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		if (icon && icon.dataset.pngSrc && !icon.dataset.pngChecked) {
 			icon.dataset.pngChecked = '1';
 			var probe = new Image();
-			probe.onload  = function() { icon.src = icon.dataset.pngSrc; };
-			probe.onerror = function() { /* keep SVG */ };
+			probe.onload = function () { icon.src = icon.dataset.pngSrc; };
+			probe.onerror = function () { /* keep SVG */ };
 			probe.src = icon.dataset.pngSrc;
 		}
 
@@ -29,13 +29,13 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		try {
 			model = JSON.parse(root.dataset.model || '{}');
 		} catch (_e) {
-			model = {error: 'Kan widget data niet lezen.'};
+			model = { error: 'Kan widget data niet lezen.' };
 		}
 
 		var errorBox = root.querySelector('.js-pgdb-error');
-		var cards    = root.querySelector('.js-pgdb-cards');
-		var rings    = root.querySelector('.js-pgdb-rings');
-		var hostBox  = root.querySelector('.js-pgdb-host-metrics');
+		var cards = root.querySelector('.js-pgdb-cards');
+		var rings = root.querySelector('.js-pgdb-rings');
+		var hostBox = root.querySelector('.js-pgdb-host-metrics');
 
 		if (!errorBox || !cards || !rings || !hostBox) { return; }
 
@@ -49,20 +49,20 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 	_renderInner(model, errorBox, cards, rings, hostBox) {
 		errorBox.textContent = '';
-		cards.innerHTML     = '';
-		rings.innerHTML     = '';
-		hostBox.innerHTML   = '';
+		cards.innerHTML = '';
+		rings.innerHTML = '';
+		hostBox.innerHTML = '';
 
 		if (model.error) { errorBox.textContent = model.error; return; }
 
-		var databases          = Array.isArray(model.databases) ? model.databases : [];
-		var clusterMetrics     = model.cluster_metrics  || {};
-		var hostMetrics        = model.host_metrics     || {};
-		var visibility         = model.visibility       || {};
-		var visibleMetricKeys  = new Set(Array.isArray(model.visible_metric_keys)      ? model.visible_metric_keys      : []);
-		var visibleHostKeys    = new Set(Array.isArray(model.visible_host_metric_keys) ? model.visible_host_metric_keys : []);
-		var cpuWarn            = Number(model.cpu_warn_threshold != null ? model.cpu_warn_threshold : 1.0);
-		var cpuHigh            = Number(model.cpu_high_threshold != null ? model.cpu_high_threshold : 2.0);
+		var databases = Array.isArray(model.databases) ? model.databases : [];
+		var clusterMetrics = model.cluster_metrics || {};
+		var hostMetrics = model.host_metrics || {};
+		var visibility = model.visibility || {};
+		var visibleMetricKeys = new Set(Array.isArray(model.visible_metric_keys) ? model.visible_metric_keys : []);
+		var visibleHostKeys = new Set(Array.isArray(model.visible_host_metric_keys) ? model.visible_host_metric_keys : []);
+		var cpuWarn = Number(model.cpu_warn_threshold != null ? model.cpu_warn_threshold : 1.0);
+		var cpuHigh = Number(model.cpu_high_threshold != null ? model.cpu_high_threshold : 2.0);
 
 		if (databases.length === 0) {
 			errorBox.textContent = 'No databases found. Check the discovery item.';
@@ -83,14 +83,14 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		// ── Host metrics ────────────────────────────────────────────────
 		var hostOrdered = [
-			{key: 'host_cpu_load_avg1_key',    fallback: 'Host CPU load (avg1)',  visible: 'show_host_cpu_avg1'},
-			{key: 'host_cpu_load_avg5_key',    fallback: 'Host CPU load (avg5)',  visible: 'show_host_cpu_avg5'},
-			{key: 'host_cpu_load_avg15_key',   fallback: 'Host CPU load (avg15)', visible: 'show_host_cpu_avg15'},
-			{key: 'host_memory_total_key',     fallback: 'Host memory total',     visible: 'show_host_mem_total'},
-			{key: 'host_memory_available_key', fallback: 'Host memory available', visible: 'show_host_mem_available'}
+			{ key: 'host_cpu_load_avg1_key', fallback: 'Host CPU load (avg1)', visible: 'show_host_cpu_avg1' },
+			{ key: 'host_cpu_load_avg5_key', fallback: 'Host CPU load (avg5)', visible: 'show_host_cpu_avg5' },
+			{ key: 'host_cpu_load_avg15_key', fallback: 'Host CPU load (avg15)', visible: 'show_host_cpu_avg15' },
+			{ key: 'host_memory_total_key', fallback: 'Host memory total', visible: 'show_host_mem_total' },
+			{ key: 'host_memory_available_key', fallback: 'Host memory available', visible: 'show_host_mem_available' }
 		];
 
-		hostOrdered.forEach(function(spec) {
+		hostOrdered.forEach(function (spec) {
 			if (!isHostVisible(spec.key, spec.visible)) { return; }
 			var metric = hostMetrics[spec.key] || null;
 			var row = document.createElement('div');
@@ -129,10 +129,10 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		// ── Database rings ───────────────────────────────────────────────
 		var preferred = (model.default_db || '').trim();
-		var selected  = databases.some(function(db) { return db.name === preferred; }) ? preferred : databases[0].name;
+		var selected = databases.some(function (db) { return db.name === preferred; }) ? preferred : databases[0].name;
 
 		function updateRings(activeDb) {
-			rings.querySelectorAll('.pgdb-widget__ring').forEach(function(ring) {
+			rings.querySelectorAll('.pgdb-widget__ring').forEach(function (ring) {
 				ring.classList.toggle('is-active', ring.dataset.dbName === activeDb);
 			});
 		}
@@ -140,38 +140,38 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		// ── Metric definitions ───────────────────────────────────────────
 		var metricThemes = {
 			active_connections: 'blue',
-			wal_write:          'teal',
-			wal_receive:        'teal',
-			wal_count:          'teal',
-			db_size:            'green',
-			backends:           'blue',
-			temp_bytes_rate:    'purple',
-			commit_rate:        'green',
-			rollback_rate:      'orange',
-			locks_total:        'orange',
-			deadlocks_rate:     'red',
-			slow_queries:       'red',
-			cache_hit:          'green',
-			replication_lag:    'orange',
-			bloat:              'red'
+			wal_write: 'teal',
+			wal_receive: 'teal',
+			wal_count: 'teal',
+			db_size: 'green',
+			backends: 'blue',
+			temp_bytes_rate: 'purple',
+			commit_rate: 'green',
+			rollback_rate: 'orange',
+			locks_total: 'orange',
+			deadlocks_rate: 'red',
+			slow_queries: 'red',
+			cache_hit: 'green',
+			replication_lag: 'orange',
+			bloat: 'red'
 		};
 
 		var orderedMetrics = [
-			{key: 'active_connections', title: 'Active connections',    source: 'cluster', visible: 'show_active_connections'},
-			{key: 'wal_write',          title: 'WAL write/s',           source: 'cluster', visible: 'show_wal_write'},
-			{key: 'db_size',            title: 'Database size',                            visible: 'show_db_size'},
-			{key: 'backends',           title: 'Active connections (DB)',                   visible: 'show_backends'},
-			{key: 'temp_bytes_rate',    title: 'Temp bytes/s',                             visible: 'show_temp_bytes'},
-			{key: 'commit_rate',        title: 'Commits/s',                                visible: 'show_commit_rate'},
-			{key: 'rollback_rate',      title: 'Rollbacks/s',                              visible: 'show_rollback_rate'},
-			{key: 'locks_total',        title: 'Locks total',                              visible: 'show_locks_total'},
-			{key: 'deadlocks_rate',     title: 'Deadlocks/s',                              visible: 'show_deadlocks_rate'},
-			{key: 'slow_queries',       title: 'Slow queries',                             visible: 'show_slow_queries'},
-			{key: 'wal_receive',        title: 'WAL receive/s',         source: 'cluster', visible: 'show_wal_receive'},
-			{key: 'wal_count',          title: 'WAL segments',          source: 'cluster', visible: 'show_wal_count'},
-			{key: 'cache_hit',          title: 'Cache hit ratio',       source: 'cluster', visible: 'show_cache_hit'},
-			{key: 'replication_lag',    title: 'Replication lag (s)',   source: 'cluster', visible: 'show_replication_lag'},
-			{key: 'bloat',              title: 'Bloating tables',                          visible: 'show_bloat'}
+			{ key: 'active_connections', title: 'Active connections', source: 'cluster', visible: 'show_active_connections' },
+			{ key: 'wal_write', title: 'WAL write/s', source: 'cluster', visible: 'show_wal_write' },
+			{ key: 'db_size', title: 'Database size', visible: 'show_db_size' },
+			{ key: 'backends', title: 'Active connections (DB)', visible: 'show_backends' },
+			{ key: 'temp_bytes_rate', title: 'Temp bytes/s', visible: 'show_temp_bytes' },
+			{ key: 'commit_rate', title: 'Commits/s', visible: 'show_commit_rate' },
+			{ key: 'rollback_rate', title: 'Rollbacks/s', visible: 'show_rollback_rate' },
+			{ key: 'locks_total', title: 'Locks total', visible: 'show_locks_total' },
+			{ key: 'deadlocks_rate', title: 'Deadlocks/s', visible: 'show_deadlocks_rate' },
+			{ key: 'slow_queries', title: 'Slow queries', visible: 'show_slow_queries' },
+			{ key: 'wal_receive', title: 'WAL receive/s', source: 'cluster', visible: 'show_wal_receive' },
+			{ key: 'wal_count', title: 'WAL segments', source: 'cluster', visible: 'show_wal_count' },
+			{ key: 'cache_hit', title: 'Cache hit ratio', source: 'cluster', visible: 'show_cache_hit' },
+			{ key: 'replication_lag', title: 'Replication lag (s)', source: 'cluster', visible: 'show_replication_lag' },
+			{ key: 'bloat', title: 'Bloating tables', visible: 'show_bloat' }
 		];
 
 		// ── Draw cards for selected DB ───────────────────────────────────
@@ -186,7 +186,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 			var metrics = db.metrics || {};
 
-			orderedMetrics.forEach(function(spec) {
+			orderedMetrics.forEach(function (spec) {
 				if (!isMetricVisible(spec.key, spec.visible)) { return; }
 
 				var metric = spec.source === 'cluster'
@@ -204,7 +204,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 				var valueEl = document.createElement('div');
 				valueEl.className = 'pgdb-widget__metric-value';
-				var rawVal  = metric ? metric.value : null;
+				var rawVal = metric ? metric.value : null;
 				var rawUnit = metric ? metric.units : null;
 				if (spec.key === 'cache_hit') {
 					var pct = Number(rawVal);
@@ -244,7 +244,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			});
 		}
 
-		databases.forEach(function(db) {
+		databases.forEach(function (db) {
 			var li = document.createElement('li');
 			li.className = 'pgdb-widget__ring';
 			li.dataset.dbName = db.name;
@@ -253,7 +253,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			btn.type = 'button';
 			btn.className = 'pgdb-widget__ring-btn';
 			btn.textContent = db.name;
-			btn.onclick = function() { draw(db.name); };
+			btn.onclick = function () { draw(db.name); };
 
 			li.appendChild(btn);
 			rings.appendChild(li);
@@ -275,14 +275,14 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 	 */
 	_buildSparkline(historyPts, rawValue, metricKey) {
 		var W = 200, H = 36;
-		var ns  = 'http://www.w3.org/2000/svg';
+		var ns = 'http://www.w3.org/2000/svg';
 
 		var pts;
 
 		if (historyPts && historyPts.length >= 2) {
 			// Filter out sentinel "no data" values (negative values, NaN)
 			// that Zabbix sometimes stores when collection fails
-			pts = historyPts.filter(function(v) { return v >= 0 && isFinite(v); });
+			pts = historyPts.filter(function (v) { return v >= 0 && isFinite(v); });
 
 			// If filtering left too few points, fall back to flat line
 			if (pts.length < 2) {
@@ -294,7 +294,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 					var lastRaw = Number(rawValue);
 					var histMax = Math.max.apply(null, pts);
 					if (histMax <= 1.0 && lastRaw > 1.0) {
-						pts = pts.map(function(v) { return v * 100; });
+						pts = pts.map(function (v) { return v * 100; });
 					}
 					if (histMax > 1.0 && lastRaw <= 1.0 && lastRaw >= 0) {
 						rawValue = lastRaw * 100;
@@ -318,8 +318,8 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			if (pts[i] > maxV) { maxV = pts[i]; }
 		}
 
-		var rng  = maxV - minV;
-		var mg   = H * 0.10;
+		var rng = maxV - minV;
+		var mg = H * 0.10;
 		var useH = H - mg * 2;
 
 		// Clamp helper — Y coords must stay within [mg, H-mg] always
@@ -328,7 +328,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			return Math.max(mg, Math.min(H - mg, raw));
 		}
 
-		var coords = pts.map(function(v, idx) {
+		var coords = pts.map(function (v, idx) {
 			return [(idx / (pts.length - 1)) * W, cy(v)];
 		});
 
@@ -341,13 +341,13 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			var p2 = coords[i + 1];
 			var p3 = coords[Math.min(i + 2, coords.length - 1)];
 			var cp1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2);
-			var cp1y = (p1[1] + (p2[1] - p0[1]) / 6).toFixed(2);
+			var cp1y = Math.max(mg, Math.min(H - mg, p1[1] + (p2[1] - p0[1]) / 6)).toFixed(2);
 			var cp2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2);
-			var cp2y = (p2[1] - (p3[1] - p1[1]) / 6).toFixed(2);
+			var cp2y = Math.max(mg, Math.min(H - mg, p2[1] - (p3[1] - p1[1]) / 6)).toFixed(2);
 			d += ' C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
 		}
 
-		var last  = coords[coords.length - 1];
+		var last = coords[coords.length - 1];
 		var baseline = (H - mg).toFixed(2);
 		var areaD = d + ' L ' + last[0].toFixed(2) + ',' + baseline + ' L ' + coords[0][0].toFixed(2) + ',' + baseline + ' Z';
 
