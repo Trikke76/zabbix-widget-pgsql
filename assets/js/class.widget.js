@@ -265,35 +265,37 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 	/**
 	 * Build a sparkline SVG.
 	 *
-	 * Uses the same min→max Y-scaling and Catmull-Rom smooth curves as the
-	 * CPU/memory (host metric) sparklines, so all sparklines look identical.
-	 * minV is clamped to ≥ 0 so the baseline never starts below zero.
+	 * Identical algorithm for ALL sparklines (host metrics AND metric cards).
+	 * min→max Y-scaling, Catmull-Rom smooth curves.
 	 *
-	 * The real bug that caused lines to appear below the card edge was that
-	 * CSS `overflow: visible` on `.pgdb-widget__sparkline` overrode the SVG's
-	 * own overflow:hidden, letting Catmull-Rom curves escape the container.
-	 * Fixed by applying a per-SVG <clipPath> — CSS cannot override that.
+	 * Root-cause of "below 0" artifacts:
+	 *   Catmull-Rom can dip below baselineY (e.g. Y=34) while still inside the
+	 *   SVG viewBox (H=36). When the fill-path then closes back to baselineY=32.4
+	 *   it runs BACKWARDS, drawing an inverted fill. A viewBox-level clipPath
+	 *   does NOT help because 34 < 36 — everything is inside the viewBox.
+	 *
+	 * Solution: the <path class="spark-area"> gets its OWN clipPath that is
+	 *   capped at baselineY. Even if the bezier dips below baseline, the fill
+	 *   is clipped and can never appear there. The line/dot use the full clip.
 	 *
 	 * @param {number[]|null} historyPts  Raw history values oldest→newest, or null.
 	 * @param {*}             rawValue    Current lastvalue (replaces last history point).
-	 * @param {string}        metricKey   Used to apply per-metric normalization (e.g. cache_hit).
+	 * @param {string}        metricKey   Per-metric normalization (e.g. cache_hit).
 	 */
 	_buildSparkline(historyPts, rawValue, metricKey) {
 		var W = 200, H = 36;
 		var ns = 'http://www.w3.org/2000/svg';
 
-		// ── 1. Build the points array ─────────────────────────────────────────
+		// ── 1. Build points array ─────────────────────────────────────────────
 		var pts;
 
 		if (historyPts && historyPts.length >= 2) {
-			// Drop any negative / non-finite sentinel values Zabbix may store.
 			pts = historyPts.filter(function (v) { return v >= 0 && isFinite(v); });
 
 			if (pts.length < 2) {
 				pts = [0, 0, 0, 0, 0];
 			} else {
-				// cache_hit normalisation: Zabbix may store 0-1 ratio while display
-				// shows 0-100 %, or vice-versa. Make history consistent with lastvalue.
+				// cache_hit: normalise 0-1 ratio vs 0-100 percentage
 				if (metricKey === 'cache_hit') {
 					var lastRaw = Number(rawValue);
 					var histMax = Math.max.apply(null, pts);
@@ -304,61 +306,48 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 					}
 				}
 
-				// Replace last history point with the current live value.
+				// Replace last history point with current live value
 				var currentVal = Number(rawValue);
 				if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal) && currentVal >= 0) {
 					pts[pts.length - 1] = currentVal;
 				}
 			}
 		} else {
-			// No usable history → flat line at baseline.
 			pts = [0, 0, 0, 0, 0];
 		}
 
-		// ── 2. Compute Y scale: min→max (relative), minV clamped to ≥ 0 ──────
-		// Clamping minV to 0 ensures the scale never starts below zero while
-		// still showing relative variation (same as host metric sparklines).
+		// ── 2. Y scale: min→max, minV clamped to ≥ 0 ─────────────────────────
 		var minV = Math.max(0, pts[0]);
 		var maxV = pts[0];
 		for (var i = 1; i < pts.length; i++) {
 			if (pts[i] < minV) { minV = pts[i]; }
 			if (pts[i] > maxV) { maxV = pts[i]; }
 		}
-		// minV can never be negative after the filter above, but clamp again.
 		minV = Math.max(0, minV);
 
 		var rng = maxV - minV;
-		var mg = H * 0.10;        // top & bottom margin (10 % each)
-		var useH = H - mg * 2;     // usable drawing height
+		var mg = H * 0.10;
+		var useH = H - mg * 2;
 
-		// Map a value → SVG Y coordinate.
-		// minV → H-mg (bottom), maxV → mg (top).
-		// When rng===0 (all values equal) the line sits in the centre.
 		function cy(v) {
 			if (rng === 0) { return H / 2; }
 			var y = H - mg - ((v - minV) / rng) * useH;
-			// Hard clamp — the clipPath is the final safety net, but clamping
-			// data points themselves prevents bezier control-point overshoot.
 			return Math.max(mg, Math.min(H - mg, y));
 		}
 
-		// ── 3. Compute canvas X/Y for every point ────────────────────────────
+		// ── 3. Canvas coordinates ─────────────────────────────────────────────
 		var n = pts.length;
 		var coords = pts.map(function (v, idx) {
 			return [(idx / (n - 1)) * W, cy(v)];
 		});
 
-		// ── 4. Catmull-Rom → cubic bezier (smooth curves) ────────────────────
-		// Control points are also clamped to [mg, H-mg] so the bezier cannot
-		// pull a curve segment outside the safe zone even when clamping the
-		// data knots above reduced the effective range.
+		// ── 4. Catmull-Rom → cubic bezier ────────────────────────────────────
 		var d = 'M ' + coords[0][0].toFixed(2) + ',' + coords[0][1].toFixed(2);
 		for (i = 0; i < coords.length - 1; i++) {
 			var p0 = coords[Math.max(i - 1, 0)];
 			var p1 = coords[i];
 			var p2 = coords[i + 1];
 			var p3 = coords[Math.min(i + 2, coords.length - 1)];
-			// Tension factor: 1/6 gives a classic Catmull-Rom approximation.
 			var cp1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2);
 			var cp1y = Math.max(mg, Math.min(H - mg, p1[1] + (p2[1] - p0[1]) / 6)).toFixed(2);
 			var cp2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2);
@@ -366,53 +355,63 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			d += ' C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
 		}
 
-		// Filled area: close path down to the baseline and back to the origin.
-		var baselineY = (H - mg).toFixed(2);
+		var baselineY = H - mg;          // numeric, for the clipPath rect height
+		var baselineYStr = baselineY.toFixed(2);
 		var last = coords[coords.length - 1];
 		var areaD = d
-			+ ' L ' + last[0].toFixed(2) + ',' + baselineY
-			+ ' L ' + coords[0][0].toFixed(2) + ',' + baselineY
+			+ ' L ' + last[0].toFixed(2) + ',' + baselineYStr
+			+ ' L ' + coords[0][0].toFixed(2) + ',' + baselineYStr
 			+ ' Z';
 
-		// ── 5. Build SVG with a <clipPath> hard-clip ─────────────────────────
-		// CSS `overflow: visible` on .pgdb-widget__sparkline was the root cause
-		// of lines escaping below the card. A SVG <clipPath> cannot be overridden
-		// by CSS and is guaranteed to clip to the viewBox.
-		var clipId = 'spark-clip-' + Math.random().toString(36).slice(2);
+		// ── 5. Build SVG ──────────────────────────────────────────────────────
+		var uid = Math.random().toString(36).slice(2);
 
 		var svg = document.createElementNS(ns, 'svg');
 		svg.setAttribute('class', 'pgdb-widget__sparkline');
 		svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 		svg.setAttribute('preserveAspectRatio', 'none');
 
+		// ── Two clipPaths ─────────────────────────────────────────────────────
+		// clipFill: caps the fill at exactly baselineY so a bezier that dips
+		//           slightly below baseline (but inside the viewBox) never
+		//           creates an inverted fill artifact.
+		// clipAll:  clips the line + dot to the full viewBox.
 		var defs = document.createElementNS(ns, 'defs');
-		var clip = document.createElementNS(ns, 'clipPath');
-		clip.setAttribute('id', clipId);
-		var clipRect = document.createElementNS(ns, 'rect');
-		clipRect.setAttribute('x', '0');
-		clipRect.setAttribute('y', '0');
-		clipRect.setAttribute('width', String(W));
-		clipRect.setAttribute('height', String(H));
-		clip.appendChild(clipRect);
-		defs.appendChild(clip);
+
+		function makeClipRect(id, height) {
+			var cp = document.createElementNS(ns, 'clipPath');
+			cp.setAttribute('id', id);
+			var r = document.createElementNS(ns, 'rect');
+			r.setAttribute('x', '0');
+			r.setAttribute('y', '0');
+			r.setAttribute('width', String(W));
+			r.setAttribute('height', String(height));
+			cp.appendChild(r);
+			return cp;
+		}
+
+		var idFill = 'spk-fill-' + uid;
+		var idAll = 'spk-all-' + uid;
+		defs.appendChild(makeClipRect(idFill, baselineY));   // stops AT baseline
+		defs.appendChild(makeClipRect(idAll, H));            // full viewBox
 		svg.appendChild(defs);
 
 		var area = document.createElementNS(ns, 'path');
 		area.setAttribute('class', 'spark-area');
 		area.setAttribute('d', areaD);
-		area.setAttribute('clip-path', 'url(#' + clipId + ')');
+		area.setAttribute('clip-path', 'url(#' + idFill + ')');   // ← baseline-capped clip
 
 		var line = document.createElementNS(ns, 'path');
 		line.setAttribute('class', 'spark-line');
 		line.setAttribute('d', d);
-		line.setAttribute('clip-path', 'url(#' + clipId + ')');
+		line.setAttribute('clip-path', 'url(#' + idAll + ')');
 
 		var dot = document.createElementNS(ns, 'circle');
 		dot.setAttribute('class', 'spark-dot');
 		dot.setAttribute('cx', last[0].toFixed(2));
 		dot.setAttribute('cy', last[1].toFixed(2));
 		dot.setAttribute('r', '2.5');
-		dot.setAttribute('clip-path', 'url(#' + clipId + ')');
+		dot.setAttribute('clip-path', 'url(#' + idAll + ')');
 
 		svg.appendChild(area);
 		svg.appendChild(line);
