@@ -118,7 +118,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			try {
 				var historyPts = (metric && Array.isArray(metric.history) && metric.history.length > 1)
 					? metric.history : null;
-				var svg = self._buildSparkline(historyPts, metric ? metric.value : null, spec.key);
+				var svg = self._buildSparkline(historyPts, metric ? metric.value : null);
 				row.appendChild(svg);
 			} catch (sparkErr) {
 				console.warn('[PgsqlClusterWidget] host sparkline failed for', spec.key, sparkErr);
@@ -225,10 +225,6 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 					valueEl.textContent = self._formatValue(rawVal, rawUnit);
 				}
 
-				card.appendChild(titleEl);
-				card.appendChild(valueEl);
-
-
 				cards.appendChild(card);
 
 			});
@@ -252,7 +248,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		draw(selected);
 	}
 
-	_buildSparkline(historyPts, rawValue, metricKey) {
+	_buildSparkline(historyPts, rawValue) {
 		var W = 200, H = 36;
 		var ns = 'http://www.w3.org/2000/svg';
 
@@ -263,15 +259,6 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			if (pts.length < 2) {
 				pts = [0, 0, 0, 0, 0];
 			} else {
-				if (metricKey === 'cache_hit') {
-					var lastRaw = Number(rawValue);
-					var histMax = Math.max.apply(null, pts);
-					if (histMax <= 1.0 && lastRaw > 1.0) {
-						pts = pts.map(function (v) { return v * 100; });
-					} else if (histMax > 1.0 && lastRaw >= 0 && lastRaw <= 1.0) {
-						rawValue = lastRaw * 100;
-					}
-				}
 				var currentVal = Number(rawValue);
 				if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal) && currentVal >= 0) {
 					pts[pts.length - 1] = currentVal;
@@ -290,8 +277,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		}
 		minV = Math.max(0, minV);
 		var rng = maxV - minV;
-		// If variation is < 5 % of the max value (e.g. cache_hit 99.97-100 %)
-		// treat as flat — amplifying noise to full chart height looks wrong.
+		// Suppress noise: treat < 5 % relative variation as flat.
 		if (rng > 0 && maxV > 0 && rng < maxV * 0.05) { rng = 0; }
 		var mg = H * 0.10;
 		var useH = H - mg * 2;

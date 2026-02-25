@@ -100,28 +100,24 @@ class WidgetView extends CControllerDashboardWidgetView
 				sort($discovered_db_names);
 			}
 
-			// Collect all item IDs that need history
+			// Collect history only for cluster + host metrics (used by top sparklines).
+			// DB metrics no longer need history (bottom card sparklines removed).
 			$item_ids_for_history = $this->collectItemIdsForHistory(
 				$all_items,
 				$cluster_metrics,
-				$host_metrics,
-				$metrics_by_db
+				$host_metrics
 			);
 
-			// Fetch history for all collected item IDs in two bulk calls (float + uint)
 			$history_map = $this->fetchHistoryBulk($item_ids_for_history);
 
-			// Attach history to metrics
 			$cluster_metrics = $this->attachHistory($cluster_metrics, $history_map);
 			$host_metrics = $this->attachHistory($host_metrics, $history_map);
 
 			$databases = [];
 			foreach ($discovered_db_names as $db_name) {
-				$db_metrics = $metrics_by_db[$db_name] ?? [];
-				$db_metrics = $this->attachHistory($db_metrics, $history_map);
 				$databases[] = [
 					'name' => $db_name,
-					'metrics' => $db_metrics
+					'metrics' => $metrics_by_db[$db_name] ?? []
 				];
 			}
 
@@ -166,8 +162,7 @@ class WidgetView extends CControllerDashboardWidgetView
 	private function collectItemIdsForHistory(
 		array $all_items,
 		array $cluster_metrics,
-		array $host_metrics,
-		array $metrics_by_db
+		array $host_metrics
 		): array
 	{
 		// Build a map of itemid => value_type from the full item list
@@ -192,9 +187,6 @@ class WidgetView extends CControllerDashboardWidgetView
 
 		$collect($cluster_metrics);
 		$collect($host_metrics);
-		foreach ($metrics_by_db as $db_metrics) {
-			$collect($db_metrics);
-		}
 
 		return $result;
 	}
