@@ -330,7 +330,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		var useH = H - mg * 2;
 
 		function cy(v) {
-			if (rng === 0) { return H / 2; }
+      if (rng === 0) { return H - mg; }   // flat line OP de baseline
 			var y = H - mg - ((v - minV) / rng) * useH;
 			return Math.max(mg, Math.min(H - mg, y));
 		}
