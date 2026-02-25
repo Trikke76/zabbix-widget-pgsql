@@ -275,13 +275,28 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 				if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal) && currentVal >= 0) {
 					pts[pts.length - 1] = currentVal;
 				}
+
+				// Strip leading zeros caused by items that were recently added or
+				// had no data in the early polling window (e.g. cache_hit just configured).
+				// Only strip when the live/current value is genuinely non-zero, so that
+				// metrics that are really zero (WAL write = 0 B) are left untouched.
+				var lastPt = pts[pts.length - 1];
+				if (lastPt > 0) {
+					var firstNonZero = 0;
+					while (firstNonZero < pts.length - 2 && pts[firstNonZero] === 0) {
+						firstNonZero++;
+					}
+					if (firstNonZero > 0) {
+						pts = pts.slice(firstNonZero);
+					}
+				}
 			}
 		} else {
 			pts = [0, 0, 0, 0, 0];
 		}
 
-		// Y scale: min→max, floor at 0
-		var minV = Math.max(0, pts[0]);
+		// Y scale: actual min/max of the (possibly trimmed) data, floored at 0
+		var minV = pts[0];
 		var maxV = pts[0];
 		for (var i = 1; i < pts.length; i++) {
 			if (pts[i] < minV) { minV = pts[i]; }
@@ -293,8 +308,8 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		var useH = H - mg * 2;
 
 		function cy(v) {
-			// All values equal → flat line ON the baseline (not centre)
-			if (rng === 0) { return H - mg; }
+			// All values equal → flat line in the vertical center
+			if (rng === 0) { return H / 2; }
 			var y = H - mg - ((v - minV) / rng) * useH;
 			return Math.max(mg, Math.min(H - mg, y));
 		}
@@ -327,9 +342,9 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			+ ' L ' + coords[0][0].toFixed(2) + ',' + baselineY.toFixed(2)
 			+ ' Z';
 
-		// SVG — ONE clipPath at baselineY clips everything (fill + line + dot).
-		// Nothing can render below the baseline regardless of bezier overshoot.
+		// SVG — clipPath at baselineY + gradient area fill
 		var clipId = 'spk-' + Math.random().toString(36).slice(2);
+		var gradId = 'spkg-' + Math.random().toString(36).slice(2);
 
 		var svg = document.createElementNS(ns, 'svg');
 		svg.setAttribute('class', 'pgdb-widget__sparkline');
@@ -337,6 +352,8 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		svg.setAttribute('preserveAspectRatio', 'none');
 
 		var defs = document.createElementNS(ns, 'defs');
+
+		// Clip rect — nothing renders below the baseline
 		var clip = document.createElementNS(ns, 'clipPath');
 		clip.setAttribute('id', clipId);
 		var clipR = document.createElementNS(ns, 'rect');
@@ -346,11 +363,31 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		clipR.setAttribute('height', String(baselineY));
 		clip.appendChild(clipR);
 		defs.appendChild(clip);
+
+		// Vertical gradient: currentColor at the line → transparent at the bottom.
+		// Works regardless of where the line sits (top for high values, bottom for low values).
+		var grad = document.createElementNS(ns, 'linearGradient');
+		grad.setAttribute('id', gradId);
+		grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+		grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+		var stop1 = document.createElementNS(ns, 'stop');
+		stop1.setAttribute('offset', '0%');
+		stop1.setAttribute('stop-color', 'currentColor');
+		stop1.setAttribute('stop-opacity', '0.18');
+		var stop2 = document.createElementNS(ns, 'stop');
+		stop2.setAttribute('offset', '100%');
+		stop2.setAttribute('stop-color', 'currentColor');
+		stop2.setAttribute('stop-opacity', '0');
+		grad.appendChild(stop1);
+		grad.appendChild(stop2);
+		defs.appendChild(grad);
+
 		svg.appendChild(defs);
 
 		var area = document.createElementNS(ns, 'path');
 		area.setAttribute('class', 'spark-area');
 		area.setAttribute('d', areaD);
+		area.setAttribute('fill', 'url(#' + gradId + ')');
 		area.setAttribute('clip-path', 'url(#' + clipId + ')');
 
 		var line = document.createElementNS(ns, 'path');
