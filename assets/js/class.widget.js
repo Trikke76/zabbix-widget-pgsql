@@ -289,8 +289,6 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		}
 		minV = Math.max(0, minV);
 		var rng = maxV - minV;
-		// Suppress noise: treat < 5 % relative variation as flat.
-		if (rng > 0 && maxV > 0 && rng < maxV * 0.05) { rng = 0; }
 		var mg = H * 0.10;
 		var useH = H - mg * 2;
 
