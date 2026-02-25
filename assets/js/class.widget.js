@@ -225,6 +225,9 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 					valueEl.textContent = self._formatValue(rawVal, rawUnit);
 				}
 
+				card.appendChild(titleEl);
+				card.appendChild(valueEl);
+
 				cards.appendChild(card);
 
 			});
