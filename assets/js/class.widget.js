@@ -15,22 +15,17 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		var root = this._body.querySelector('.js-pgdb-widget');
 		if (!root) { return; }
 
-		// Try to load PNG; if it exists swap it in, otherwise keep SVG
 		var icon = root.querySelector('.js-pgdb-icon');
 		if (icon && icon.dataset.pngSrc && !icon.dataset.pngChecked) {
 			icon.dataset.pngChecked = '1';
 			var probe = new Image();
 			probe.onload = function () { icon.src = icon.dataset.pngSrc; };
-			probe.onerror = function () { /* keep SVG */ };
 			probe.src = icon.dataset.pngSrc;
 		}
 
 		var model = {};
-		try {
-			model = JSON.parse(root.dataset.model || '{}');
-		} catch (_e) {
-			model = { error: 'Kan widget data niet lezen.' };
-		}
+		try { model = JSON.parse(root.dataset.model || '{}'); }
+		catch (_e) { model = { error: 'Kan widget data niet lezen.' }; }
 
 		var errorBox = root.querySelector('.js-pgdb-error');
 		var cards = root.querySelector('.js-pgdb-cards');
@@ -55,204 +50,136 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		if (model.error) { errorBox.textContent = model.error; return; }
 
+		// Metric Dictionary voor Tooltips
+		const metricDictionary = {
+			active_connections: "Total number of established connections to the database cluster.",
+			wal_write: "Rate of data written to the Write-Ahead Log. High values indicate heavy write activity.",
+			wal_receive: "Rate of WAL data received from the primary (on standby nodes).",
+			wal_count: "Number of WAL segments currently in the pg_wal directory.",
+			db_size: "Total disk space occupied by the database files.",
+			backends: "Number of active server processes for this specific database.",
+			temp_bytes_rate: "Amount of temporary data written to disk (due to work_mem being too low for sorts/joins).",
+			commit_rate: "Number of successful transactions per second.",
+			rollback_rate: "Number of failed/aborted transactions per second. Keep this low.",
+			locks_total: "Number of active locks. Excessive locking can indicate concurrency issues.",
+			deadlocks_rate: "Frequency of deadlock situations where transactions block each other.",
+			slow_queries: "Queries exceeding the defined execution time threshold.",
+			cache_hit: "Percentage of data blocks found in shared buffers vs. read from disk. Ideal > 95%.",
+			replication_lag: "Delay between the primary server and this standby in seconds.",
+			bloat: "Estimated wasted space in tables/indexes caused by updates and deletes.",
+			xid_age: "Age of the oldest transaction ID. If this hits 2 billion, the DB enters read-only mode!",
+			checkpoint_req: "Checkpoints requested manually or by WAL volume. Too many indicate max_wal_size is too low.",
+			checkpoint_sch: "Checkpoints occurring on a regular schedule (Time-based). This is the preferred way."
+		};
+
 		var databases = Array.isArray(model.databases) ? model.databases : [];
 		var clusterMetrics = model.cluster_metrics || {};
 		var hostMetrics = model.host_metrics || {};
-		var visibility = model.visibility || {};
 		var visibleMetricKeys = new Set(Array.isArray(model.visible_metric_keys) ? model.visible_metric_keys : []);
 		var visibleHostKeys = new Set(Array.isArray(model.visible_host_metric_keys) ? model.visible_host_metric_keys : []);
-		var cpuWarn = Number(model.cpu_warn_threshold != null ? model.cpu_warn_threshold : 1.0);
-		var cpuHigh = Number(model.cpu_high_threshold != null ? model.cpu_high_threshold : 2.0);
-
-		if (databases.length === 0) {
-			errorBox.textContent = 'No databases found. Check the discovery item.';
-			return;
-		}
 
 		var self = this;
 
-		function isHidden(key) {
-			return Object.prototype.hasOwnProperty.call(visibility, key) && !Boolean(Number(visibility[key]));
-		}
-		function isMetricVisible(mKey, vKey) {
-			return visibleMetricKeys.size > 0 ? visibleMetricKeys.has(mKey) : !isHidden(vKey);
-		}
-		function isHostVisible(mKey, vKey) {
-			return visibleHostKeys.size > 0 ? visibleHostKeys.has(mKey) : !isHidden(vKey);
-		}
-
-		// ── Host metrics ────────────────────────────────────────────────
+		// ── Host metrics ──
 		var hostOrdered = [
-			{ key: 'host_cpu_load_avg1_key', fallback: 'Host CPU load (avg1)', visible: 'show_host_cpu_avg1' },
-			{ key: 'host_cpu_load_avg5_key', fallback: 'Host CPU load (avg5)', visible: 'show_host_cpu_avg5' },
-			{ key: 'host_cpu_load_avg15_key', fallback: 'Host CPU load (avg15)', visible: 'show_host_cpu_avg15' },
-			{ key: 'host_memory_total_key', fallback: 'Host memory total', visible: 'show_host_mem_total' },
-			{ key: 'host_memory_available_key', fallback: 'Host memory available', visible: 'show_host_mem_available' }
+			{ key: 'host_cpu_load_avg1_key', fallback: 'Host CPU load (avg1)' },
+			{ key: 'host_cpu_load_avg5_key', fallback: 'Host CPU load (avg5)' },
+			{ key: 'host_cpu_load_avg15_key', fallback: 'Host CPU load (avg15)' },
+			{ key: 'host_memory_total_key', fallback: 'Host memory total' },
+			{ key: 'host_memory_available_key', fallback: 'Host memory available' }
 		];
 
 		hostOrdered.forEach(function (spec) {
-			if (!isHostVisible(spec.key, spec.visible)) { return; }
+			if (visibleHostKeys.size > 0 && !visibleHostKeys.has(spec.key)) { return; }
 			var metric = hostMetrics[spec.key] || null;
 			var row = document.createElement('div');
 			row.className = 'pgdb-widget__host-metric';
 
-			var lbl = document.createElement('div');
-			lbl.className = 'pgdb-widget__host-metric-label';
-			lbl.textContent = metric ? metric.label : spec.fallback;
-
-			var val = document.createElement('div');
-			val.className = 'pgdb-widget__host-metric-value';
-			val.textContent = self._formatValue(metric ? metric.value : null, metric ? metric.units : null);
-
-			if (spec.key === 'host_cpu_load_avg1_key') {
-				var num = Number(metric ? metric.value : null);
-				if (!isNaN(num)) {
-					if (num >= cpuHigh) { row.classList.add('is-cpu-high'); }
-					else if (num >= cpuWarn) { row.classList.add('is-cpu-warn'); }
-				}
+			if (spec.key === 'host_cpu_load_avg1_key' && metric) {
+				var cpuWarn = Number(model.cpu_warn_threshold || 1.0);
+				var cpuHigh = Number(model.cpu_high_threshold || 2.0);
+				var num = Number(metric.value);
+				if (num >= cpuHigh) row.classList.add('is-cpu-high');
+				else if (num >= cpuWarn) row.classList.add('is-cpu-warn');
 			}
 
-			row.appendChild(lbl);
-			row.appendChild(val);
+			row.innerHTML = `<div class="pgdb-widget__host-metric-label">${metric ? metric.label : spec.fallback}</div>
+							 <div class="pgdb-widget__host-metric-value">${self._formatValue(metric ? metric.value : null, metric ? metric.units : null)}</div>`;
 
-			try {
-				var historyPts = (metric && Array.isArray(metric.history) && metric.history.length > 1)
-					? metric.history : null;
-				var svg = self._buildSparkline(historyPts, metric ? metric.value : null);
-				row.appendChild(svg);
-			} catch (sparkErr) {
-				console.warn('[PgsqlClusterWidget] host sparkline failed for', spec.key, sparkErr);
-			}
-
+			var history = (metric && Array.isArray(metric.history)) ? metric.history : [];
+			row.appendChild(self._buildSparkline(history));
 			hostBox.appendChild(row);
 		});
 
-		// ── Database rings ───────────────────────────────────────────────
+		// ── Database metrics ──
 		var preferred = (model.default_db || '').trim();
-		var selected = databases.some(function (db) { return db.name === preferred; }) ? preferred : databases[0].name;
+		var selected = databases.some(db => db.name === preferred) ? preferred : databases[0].name;
 
-		function updateRings(activeDb) {
-			rings.querySelectorAll('.pgdb-widget__ring').forEach(function (ring) {
-				ring.classList.toggle('is-active', ring.dataset.dbName === activeDb);
-			});
-		}
-
-		// ── Metric definitions ───────────────────────────────────────────
 		var metricThemes = {
-			active_connections: 'blue',
-			wal_write: 'teal',
-			wal_receive: 'teal',
-			wal_count: 'teal',
-			db_size: 'green',
-			backends: 'blue',
-			temp_bytes_rate: 'purple',
-			commit_rate: 'green',
-			rollback_rate: 'orange',
-			locks_total: 'orange',
-			deadlocks_rate: 'red',
-			slow_queries: 'red',
-			cache_hit: 'green',
-			replication_lag: 'orange',
-			bloat: 'red'
+			active_connections: 'blue', wal_write: 'teal', wal_receive: 'teal', wal_count: 'teal',
+			db_size: 'green', backends: 'blue', temp_bytes_rate: 'purple', commit_rate: 'green',
+			rollback_rate: 'orange', locks_total: 'orange', deadlocks_rate: 'red',
+			slow_queries: 'red', cache_hit: 'green', replication_lag: 'orange', bloat: 'red',
+			xid_age: 'red', checkpoint_req: 'orange', checkpoint_sch: 'blue'
 		};
 
 		var orderedMetrics = [
-			{ key: 'active_connections', title: 'Active connections', source: 'cluster', visible: 'show_active_connections' },
-			{ key: 'wal_write', title: 'WAL write/s', source: 'cluster', visible: 'show_wal_write' },
-			{ key: 'db_size', title: 'Database size', visible: 'show_db_size' },
-			{ key: 'backends', title: 'Active connections (DB)', visible: 'show_backends' },
-			{ key: 'temp_bytes_rate', title: 'Temp bytes/s', visible: 'show_temp_bytes' },
-			{ key: 'commit_rate', title: 'Commits/s', visible: 'show_commit_rate' },
-			{ key: 'rollback_rate', title: 'Rollbacks/s', visible: 'show_rollback_rate' },
-			{ key: 'locks_total', title: 'Locks total', visible: 'show_locks_total' },
-			{ key: 'deadlocks_rate', title: 'Deadlocks/s', visible: 'show_deadlocks_rate' },
-			{ key: 'slow_queries', title: 'Slow queries', visible: 'show_slow_queries' },
-			{ key: 'wal_receive', title: 'WAL receive/s', source: 'cluster', visible: 'show_wal_receive' },
-			{ key: 'wal_count', title: 'WAL segments', source: 'cluster', visible: 'show_wal_count' },
-			{ key: 'cache_hit', title: 'Cache hit ratio', source: 'cluster', visible: 'show_cache_hit' },
-			{ key: 'replication_lag', title: 'Replication lag (s)', source: 'cluster', visible: 'show_replication_lag' },
-			{ key: 'bloat', title: 'Bloating tables', visible: 'show_bloat' }
+			{ key: 'active_connections', title: 'Active connections', source: 'cluster' },
+			{ key: 'wal_write', title: 'WAL write/s', source: 'cluster' },
+			{ key: 'db_size', title: 'Database size' },
+			{ key: 'backends', title: 'Active connections (DB)' },
+			{ key: 'temp_bytes_rate', title: 'Temp bytes/s' },
+			{ key: 'commit_rate', title: 'Commits/s' },
+			{ key: 'rollback_rate', title: 'Rollbacks/s' },
+			{ key: 'locks_total', title: 'Locks total' },
+			{ key: 'deadlocks_rate', title: 'Deadlocks/s' },
+			{ key: 'slow_queries', title: 'Slow queries' },
+			{ key: 'wal_receive', title: 'WAL receive/s', source: 'cluster' },
+			{ key: 'wal_count', title: 'WAL segments', source: 'cluster' },
+			{ key: 'cache_hit', title: 'Cache hit ratio', source: 'cluster' },
+			{ key: 'replication_lag', title: 'Replication lag (s)', source: 'cluster' },
+			{ key: 'bloat', title: 'Bloating tables' },
+			{ key: 'xid_age', title: 'Oldest XID Age', source: 'cluster' },
+			{ key: 'checkpoint_req', title: 'Checkpoint Req/s', source: 'cluster' },
+			{ key: 'checkpoint_sch', title: 'Checkpoint Sch/s', source: 'cluster' }
 		];
 
-		// ── Draw cards for selected DB ───────────────────────────────────
 		function draw(dbName) {
-			var db = null;
-			for (var i = 0; i < databases.length; i++) {
-				if (databases[i].name === dbName) { db = databases[i]; break; }
-			}
 			cards.innerHTML = '';
+			var db = databases.find(d => d.name === dbName) || databases[0];
 			updateRings(dbName);
-			if (!db) { return; }
 
-			var metrics = db.metrics || {};
-
-			orderedMetrics.forEach(function (spec) {
-				if (!isMetricVisible(spec.key, spec.visible)) { return; }
-
-				var metric = spec.source === 'cluster'
-					? (clusterMetrics[spec.key] || null)
-					: (metrics[spec.key] || null);
-
+			orderedMetrics.forEach(spec => {
+				if (visibleMetricKeys.size > 0 && !visibleMetricKeys.has(spec.key)) return;
+				var metric = spec.source === 'cluster' ? clusterMetrics[spec.key] : db.metrics[spec.key];
 				var card = document.createElement('div');
 				card.className = 'pgdb-widget__card';
 				card.setAttribute('data-theme', metricThemes[spec.key] || 'blue');
 
-				var titleEl = document.createElement('div');
-				titleEl.className = 'pgdb-widget__metric-title';
-				titleEl.textContent = spec.title;
-				titleEl.title = spec.title;
+				// Tooltip toevoegen
+				card.setAttribute('title', metricDictionary[spec.key] || '');
 
-				var valueEl = document.createElement('div');
-				valueEl.className = 'pgdb-widget__metric-value';
-				var rawVal = metric ? metric.value : null;
-				var rawUnit = metric ? metric.units : null;
-				if (spec.key === 'cache_hit') {
-					var pct = Number(rawVal);
-					valueEl.textContent = (rawVal !== null && !isNaN(pct))
-						? ((pct <= 1 ? pct * 100 : pct).toFixed(2) + ' %')
-						: 'n/a';
-				} else if (spec.key === 'replication_lag') {
-					var secs = Number(rawVal);
-					valueEl.textContent = (rawVal !== null && !isNaN(secs))
-						? (secs.toFixed(1) + ' s')
-						: 'n/a';
-				} else if (spec.key === 'bloat') {
-					var n = Number(rawVal);
-					valueEl.textContent = (rawVal !== null && !isNaN(n))
-						? Math.round(n).toLocaleString()
-						: 'n/a';
-				} else {
-					valueEl.textContent = self._formatValue(rawVal, rawUnit);
-				}
+				card.innerHTML = `<div class="pgdb-widget__metric-title">${spec.title}</div>
+								  <div class="pgdb-widget__metric-value">${self._formatValue(metric ? metric.value : null, metric ? metric.units : null)}</div>`;
 
-				card.appendChild(titleEl);
-				card.appendChild(valueEl);
-
-				try {
-					var historyPts = (metric && Array.isArray(metric.history) && metric.history.length > 1)
-						? metric.history : null;
-					var svg = self._buildSparkline(historyPts, rawVal);
-					card.appendChild(svg);
-				} catch (sparkErr) {
-					console.warn('[PgsqlClusterWidget] card sparkline failed for', spec.key, sparkErr);
-				}
-
+				var history = (metric && Array.isArray(metric.history)) ? metric.history : [];
+				card.appendChild(self._buildSparkline(history));
 				cards.appendChild(card);
-
 			});
 		}
 
-		databases.forEach(function (db) {
+		function updateRings(activeDb) {
+			rings.querySelectorAll('.pgdb-widget__ring').forEach(r => r.classList.toggle('is-active', r.dataset.dbName === activeDb));
+		}
+
+		databases.forEach(db => {
 			var li = document.createElement('li');
 			li.className = 'pgdb-widget__ring';
 			li.dataset.dbName = db.name;
-
 			var btn = document.createElement('button');
-			btn.type = 'button';
 			btn.className = 'pgdb-widget__ring-btn';
 			btn.textContent = db.name;
-			btn.onclick = function () { draw(db.name); };
-
+			btn.onclick = () => draw(db.name);
 			li.appendChild(btn);
 			rings.appendChild(li);
 		});
@@ -260,168 +187,47 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		draw(selected);
 	}
 
-	_buildSparkline(historyPts, rawValue) {
+	_buildSparkline(history) {
 		var W = 200, H = 36;
-		var ns = 'http://www.w3.org/2000/svg';
+		var pts = (history || []).map(Number).filter(isFinite);
+		if (pts.length < 2) pts = [0, 0];
 
-		// Build points array
-		var pts;
-		if (historyPts && historyPts.length >= 2) {
-			pts = historyPts.filter(function (v) { return v >= 0 && isFinite(v); });
-			if (pts.length < 2) {
-				pts = [0, 0, 0, 0, 0];
-			} else {
-				var currentVal = Number(rawValue);
-				if (rawValue !== null && rawValue !== undefined && !isNaN(currentVal) && currentVal >= 0) {
-					pts[pts.length - 1] = currentVal;
-				}
+		var maxV = Math.max(...pts) || 1;
+		var coords = pts.map((v, i) => [(i / (pts.length - 1)) * W, H - ((v / maxV) * H)]);
 
-				// Strip leading zeros caused by items that were recently added or
-				// had no data in the early polling window (e.g. cache_hit just configured).
-				// Only strip when the live/current value is genuinely non-zero, so that
-				// metrics that are really zero (WAL write = 0 B) are left untouched.
-				var lastPt = pts[pts.length - 1];
-				if (lastPt > 0) {
-					var firstNonZero = 0;
-					while (firstNonZero < pts.length - 2 && pts[firstNonZero] === 0) {
-						firstNonZero++;
-					}
-					if (firstNonZero > 0) {
-						pts = pts.slice(firstNonZero);
-					}
-				}
-			}
-		} else {
-			pts = [0, 0, 0, 0, 0];
+		var d = `M ${coords[0][0].toFixed(2)},${coords[0][1].toFixed(2)}`;
+		for (var i = 0; i < coords.length - 1; i++) {
+			var p0 = coords[Math.max(i - 1, 0)], p1 = coords[i], p2 = coords[i + 1], p3 = coords[Math.min(i + 2, coords.length - 1)];
+			var cp1x = p1[0] + (p2[0] - p0[0]) / 6, cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+			var cp2x = p2[0] - (p3[0] - p1[0]) / 6, cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+			d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
 		}
 
-		// Y scale: actual min/max of the (possibly trimmed) data, floored at 0
-		var minV = pts[0];
-		var maxV = pts[0];
-		for (var i = 1; i < pts.length; i++) {
-			if (pts[i] < minV) { minV = pts[i]; }
-			if (pts[i] > maxV) { maxV = pts[i]; }
-		}
-		minV = Math.max(0, minV);
-		var rng = maxV - minV;
-		var mg = H * 0.10;
-		var useH = H - mg * 2;
-
-		function cy(v) {
-			// All values equal → flat line in the vertical center
-			if (rng === 0) { return H / 2; }
-			var y = H - mg - ((v - minV) / rng) * useH;
-			return Math.max(mg, Math.min(H - mg, y));
-		}
-
-		// Canvas coords
-		var n = pts.length;
-		var coords = pts.map(function (v, idx) {
-			return [(idx / (n - 1)) * W, cy(v)];
-		});
-
-		// Catmull-Rom → cubic bezier (smooth curves)
-		var d = 'M ' + coords[0][0].toFixed(2) + ',' + coords[0][1].toFixed(2);
-		for (i = 0; i < coords.length - 1; i++) {
-			var p0 = coords[Math.max(i - 1, 0)];
-			var p1 = coords[i];
-			var p2 = coords[i + 1];
-			var p3 = coords[Math.min(i + 2, coords.length - 1)];
-			var cp1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2);
-			var cp1y = Math.max(mg, Math.min(H - mg, p1[1] + (p2[1] - p0[1]) / 6)).toFixed(2);
-			var cp2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2);
-			var cp2y = Math.max(mg, Math.min(H - mg, p2[1] - (p3[1] - p1[1]) / 6)).toFixed(2);
-			d += ' C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
-		}
-
-		// Filled area (closed path down to the baseline)
-		var baselineY = H - mg;
-		var last = coords[coords.length - 1];
-		var areaD = d
-			+ ' L ' + last[0].toFixed(2) + ',' + baselineY.toFixed(2)
-			+ ' L ' + coords[0][0].toFixed(2) + ',' + baselineY.toFixed(2)
-			+ ' Z';
-
-		// SVG — clipPath at baselineY + gradient area fill
-		var clipId = 'spk-' + Math.random().toString(36).slice(2);
-		var gradId = 'spkg-' + Math.random().toString(36).slice(2);
-
-		var svg = document.createElementNS(ns, 'svg');
+		var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 		svg.setAttribute('class', 'pgdb-widget__sparkline');
-		svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+		svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 		svg.setAttribute('preserveAspectRatio', 'none');
 
-		var defs = document.createElementNS(ns, 'defs');
-
-		// Clip rect — nothing renders below the baseline
-		var clip = document.createElementNS(ns, 'clipPath');
-		clip.setAttribute('id', clipId);
-		var clipR = document.createElementNS(ns, 'rect');
-		clipR.setAttribute('x', '0');
-		clipR.setAttribute('y', '0');
-		clipR.setAttribute('width', String(W));
-		clipR.setAttribute('height', String(baselineY));
-		clip.appendChild(clipR);
-		defs.appendChild(clip);
-
-		// Vertical gradient: currentColor at the line → transparent at the bottom.
-		// Works regardless of where the line sits (top for high values, bottom for low values).
-		var grad = document.createElementNS(ns, 'linearGradient');
-		grad.setAttribute('id', gradId);
-		grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
-		grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
-		var stop1 = document.createElementNS(ns, 'stop');
-		stop1.setAttribute('offset', '0%');
-		stop1.setAttribute('stop-color', 'currentColor');
-		stop1.setAttribute('stop-opacity', '0.18');
-		var stop2 = document.createElementNS(ns, 'stop');
-		stop2.setAttribute('offset', '100%');
-		stop2.setAttribute('stop-color', 'currentColor');
-		stop2.setAttribute('stop-opacity', '0');
-		grad.appendChild(stop1);
-		grad.appendChild(stop2);
-		defs.appendChild(grad);
-
-		svg.appendChild(defs);
-
-		var area = document.createElementNS(ns, 'path');
-		area.setAttribute('class', 'spark-area');
-		area.setAttribute('d', areaD);
-		area.setAttribute('fill', 'url(#' + gradId + ')');
-		area.setAttribute('clip-path', 'url(#' + clipId + ')');
-
-		var line = document.createElementNS(ns, 'path');
-		line.setAttribute('class', 'spark-line');
-		line.setAttribute('d', d);
-		line.setAttribute('clip-path', 'url(#' + clipId + ')');
-
-		var dot = document.createElementNS(ns, 'circle');
-		dot.setAttribute('class', 'spark-dot');
-		dot.setAttribute('cx', last[0].toFixed(2));
-		dot.setAttribute('cy', last[1].toFixed(2));
-		dot.setAttribute('r', '2.5');
-		dot.setAttribute('clip-path', 'url(#' + clipId + ')');
-
-		svg.appendChild(area);
-		svg.appendChild(line);
-		svg.appendChild(dot);
+		svg.innerHTML = `
+			<path class="spark-area" d="${d} L ${W},${H} L 0,${H} Z" fill="currentColor" />
+			<path class="spark-line" d="${d}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+			<circle class="spark-dot" cx="${coords[coords.length-1][0]}" cy="${coords[coords.length-1][1]}" r="2" fill="currentColor" />
+		`;
 		return svg;
 	}
 
-	_formatValue(rawValue, units) {
-		if (rawValue === null || rawValue === undefined || rawValue === '') { return 'n/a'; }
-		var value = Number(rawValue);
-		if (isNaN(value)) { return String(rawValue); }
-		if (units === 'B') { return this._formatBytes(value); }
-		if (Math.abs(value) >= 1000) { return value.toLocaleString() + (units ? ' ' + units : ''); }
-		var shown = Math.abs(value) < 10 ? value.toFixed(2) : value.toFixed(1);
-		return shown + (units ? ' ' + units : '');
+	_formatValue(v, u) {
+		if (v == null || v === '') return 'n/a';
+		var n = Number(v);
+		if (isNaN(n)) return String(v);
+		if (u === 'B') return this._formatBytes(n);
+		return n.toLocaleString() + (u ? ' ' + u : '');
 	}
 
-	_formatBytes(bytes) {
-		var us = ['B', 'KB', 'MB', 'GB', 'TB'];
-		var v = bytes, idx = 0;
-		while (Math.abs(v) >= 1024 && idx < us.length - 1) { v /= 1024; idx++; }
-		return v.toFixed(Math.abs(bytes) >= 1024 ? 2 : 0) + ' ' + us[idx];
+	_formatBytes(b) {
+		var s = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+		var v = b;
+		while (Math.abs(v) >= 1024 && i < s.length - 1) { v /= 1024; i++; }
+		return v.toFixed(Math.abs(b) >= 1024 ? 2 : 0) + ' ' + s[i];
 	}
 };
