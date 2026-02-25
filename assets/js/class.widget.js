@@ -228,6 +228,15 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 				card.appendChild(titleEl);
 				card.appendChild(valueEl);
 
+				try {
+					var historyPts = (metric && Array.isArray(metric.history) && metric.history.length > 1)
+						? metric.history : null;
+					var svg = self._buildSparkline(historyPts, rawVal);
+					card.appendChild(svg);
+				} catch (sparkErr) {
+					console.warn('[PgsqlClusterWidget] card sparkline failed for', spec.key, sparkErr);
+				}
+
 				cards.appendChild(card);
 
 			});

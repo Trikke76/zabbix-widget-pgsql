@@ -256,29 +256,89 @@
 	r: 2.5;
 }
 
-/* Color themes per metric type — metric-value colours */
+/* Color themes per metric type — metric-value colours + sparkline colours */
 .pgdb-widget__card[data-theme="blue"] .pgdb-widget__metric-value {
 	color: #0288d1;
+}
+
+.pgdb-widget__card[data-theme="blue"] .spark-line,
+.pgdb-widget__card[data-theme="blue"] .spark-dot {
+	stroke: #0288d1;
+	fill: #0288d1;
+}
+
+.pgdb-widget__card[data-theme="blue"] .spark-area {
+	fill: #0288d1;
 }
 
 .pgdb-widget__card[data-theme="green"] .pgdb-widget__metric-value {
 	color: #00796b;
 }
 
+.pgdb-widget__card[data-theme="green"] .spark-line,
+.pgdb-widget__card[data-theme="green"] .spark-dot {
+	stroke: #00796b;
+	fill: #00796b;
+}
+
+.pgdb-widget__card[data-theme="green"] .spark-area {
+	fill: #00796b;
+}
+
 .pgdb-widget__card[data-theme="orange"] .pgdb-widget__metric-value {
 	color: #e65100;
+}
+
+.pgdb-widget__card[data-theme="orange"] .spark-line,
+.pgdb-widget__card[data-theme="orange"] .spark-dot {
+	stroke: #e65100;
+	fill: #e65100;
+}
+
+.pgdb-widget__card[data-theme="orange"] .spark-area {
+	fill: #e65100;
 }
 
 .pgdb-widget__card[data-theme="red"] .pgdb-widget__metric-value {
 	color: #c62828;
 }
 
+.pgdb-widget__card[data-theme="red"] .spark-line,
+.pgdb-widget__card[data-theme="red"] .spark-dot {
+	stroke: #c62828;
+	fill: #c62828;
+}
+
+.pgdb-widget__card[data-theme="red"] .spark-area {
+	fill: #c62828;
+}
+
 .pgdb-widget__card[data-theme="purple"] .pgdb-widget__metric-value {
 	color: #6a1b9a;
 }
 
+.pgdb-widget__card[data-theme="purple"] .spark-line,
+.pgdb-widget__card[data-theme="purple"] .spark-dot {
+	stroke: #6a1b9a;
+	fill: #6a1b9a;
+}
+
+.pgdb-widget__card[data-theme="purple"] .spark-area {
+	fill: #6a1b9a;
+}
+
 .pgdb-widget__card[data-theme="teal"] .pgdb-widget__metric-value {
 	color: #00838f;
+}
+
+.pgdb-widget__card[data-theme="teal"] .spark-line,
+.pgdb-widget__card[data-theme="teal"] .spark-dot {
+	stroke: #00838f;
+	fill: #00838f;
+}
+
+.pgdb-widget__card[data-theme="teal"] .spark-area {
+	fill: #00838f;
 }
 
 /* Dark-theme overrides */
@@ -287,24 +347,84 @@
 		color: #81d4fa;
 	}
 
+	.pgdb-widget__card[data-theme="blue"] .spark-line,
+	.pgdb-widget__card[data-theme="blue"] .spark-dot {
+		stroke: #81d4fa;
+		fill: #81d4fa;
+	}
+
+	.pgdb-widget__card[data-theme="blue"] .spark-area {
+		fill: #81d4fa;
+	}
+
 	.pgdb-widget__card[data-theme="green"] .pgdb-widget__metric-value {
 		color: #80cbc4;
+	}
+
+	.pgdb-widget__card[data-theme="green"] .spark-line,
+	.pgdb-widget__card[data-theme="green"] .spark-dot {
+		stroke: #80cbc4;
+		fill: #80cbc4;
+	}
+
+	.pgdb-widget__card[data-theme="green"] .spark-area {
+		fill: #80cbc4;
 	}
 
 	.pgdb-widget__card[data-theme="orange"] .pgdb-widget__metric-value {
 		color: #ffcc80;
 	}
 
+	.pgdb-widget__card[data-theme="orange"] .spark-line,
+	.pgdb-widget__card[data-theme="orange"] .spark-dot {
+		stroke: #ffcc80;
+		fill: #ffcc80;
+	}
+
+	.pgdb-widget__card[data-theme="orange"] .spark-area {
+		fill: #ffcc80;
+	}
+
 	.pgdb-widget__card[data-theme="red"] .pgdb-widget__metric-value {
 		color: #ef9a9a;
+	}
+
+	.pgdb-widget__card[data-theme="red"] .spark-line,
+	.pgdb-widget__card[data-theme="red"] .spark-dot {
+		stroke: #ef9a9a;
+		fill: #ef9a9a;
+	}
+
+	.pgdb-widget__card[data-theme="red"] .spark-area {
+		fill: #ef9a9a;
 	}
 
 	.pgdb-widget__card[data-theme="purple"] .pgdb-widget__metric-value {
 		color: #ce93d8;
 	}
 
+	.pgdb-widget__card[data-theme="purple"] .spark-line,
+	.pgdb-widget__card[data-theme="purple"] .spark-dot {
+		stroke: #ce93d8;
+		fill: #ce93d8;
+	}
+
+	.pgdb-widget__card[data-theme="purple"] .spark-area {
+		fill: #ce93d8;
+	}
+
 	.pgdb-widget__card[data-theme="teal"] .pgdb-widget__metric-value {
 		color: #80deea;
+	}
+
+	.pgdb-widget__card[data-theme="teal"] .spark-line,
+	.pgdb-widget__card[data-theme="teal"] .spark-dot {
+		stroke: #80deea;
+		fill: #80deea;
+	}
+
+	.pgdb-widget__card[data-theme="teal"] .spark-area {
+		fill: #80deea;
 	}
 
 	.pgdb-widget__card {
