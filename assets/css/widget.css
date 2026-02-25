@@ -43,22 +43,6 @@
 	filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.14));
 }
 
-.pgdb-widget__ring {
-	position: relative;
-}
-
-.pgdb-widget__ring::before {
-	content: "";
-	position: absolute;
-	left: -14px;
-	top: 50%;
-	width: 8px;
-	height: 2px;
-	border-radius: 3px;
-	background: linear-gradient(180deg, rgba(118, 141, 157, 0.65) 0%, rgba(182, 198, 209, 0.8) 100%);
-	transform: translateY(-50%);
-}
-
 .pgdb-widget__ring-btn {
 	width: 100%;
 	text-align: left;
@@ -70,15 +54,15 @@
 	background: linear-gradient(180deg, #f3f5f7 0%, #cdd3d8 52%, #e0e5e9 100%);
 	color: #27313a;
 	cursor: pointer;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.8),
-		inset 0 -1px 0 rgba(0, 0, 0, 0.08);
 }
 
-/* ── Host metrics grid ── */
+.pgdb-widget__ring.is-active .pgdb-widget__ring-btn {
+	border-color: #00bde8;
+	background: linear-gradient(180deg, #d7f6ff 0%, #9fe7f7 52%, #c7f1fb 100%);
+	font-weight: 600;
+}
+
+/* ── Host metrics ── */
 .pgdb-widget__host-metrics {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(170px, 1fr));
@@ -91,102 +75,38 @@
 	border-radius: 6px;
 	padding: 8px 10px 4px 10px;
 	background: rgba(20, 26, 32, 0.04);
-	overflow: hidden;
 	display: flex;
 	flex-direction: column;
 }
 
-.pgdb-widget__host-metric-label {
-	font-size: 10px;
-	font-weight: 500;
-	letter-spacing: 0.03em;
-	text-transform: uppercase;
-	opacity: 0.6;
-	line-height: 1.2;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.pgdb-widget__host-metric-value {
-	margin-top: 2px;
-	font-size: 16px;
-	font-weight: 700;
-	line-height: 1.2;
-}
-
-/* Sparkline inside host metric tiles — reuse the same SVG classes */
-.pgdb-widget__host-metric .pgdb-widget__sparkline {
-	margin-top: 5px;
+/* ── Sparkline Basic Styling ── */
+.pgdb-widget__sparkline {
+	margin-top: 6px;
+	width: 100%;
 	height: 28px;
+	display: block;
 }
 
-/* Color theme for host metric sparklines */
-.pgdb-widget__host-metric .spark-line,
-.pgdb-widget__host-metric .spark-dot {
-	stroke: #29b6f6;
-	fill: #29b6f6;
+/* De vulling: ALTIJD transparant, ongeacht de kleur */
+.pgdb-widget__sparkline .spark-area {
+	fill: currentColor;
+	fill-opacity: 0.12 !important;
+	stroke: none;
 }
 
-.pgdb-widget__host-metric .spark-area {
-	fill: #29b6f6;
-	opacity: 0.12;
+.pgdb-widget__sparkline .spark-line {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
-.pgdb-widget__host-metric .pgdb-widget__host-metric-value {
-	color: inherit;
+.pgdb-widget__sparkline .spark-dot {
+	fill: currentColor;
 }
 
-/* CPU warn / high overrides */
-.pgdb-widget__host-metric.is-cpu-warn {
-	border-color: rgba(243, 156, 18, 0.55);
-	box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.18);
-}
-
-.pgdb-widget__host-metric.is-cpu-warn .spark-line,
-.pgdb-widget__host-metric.is-cpu-warn .spark-dot {
-	stroke: #ffa726;
-	fill: #ffa726;
-}
-
-.pgdb-widget__host-metric.is-cpu-warn .spark-area {
-	fill: #ffa726;
-}
-
-.pgdb-widget__host-metric.is-cpu-high {
-	border-color: rgba(230, 126, 34, 0.65);
-	box-shadow: inset 0 0 0 1px rgba(230, 126, 34, 0.24);
-}
-
-.pgdb-widget__host-metric.is-cpu-high .spark-line,
-.pgdb-widget__host-metric.is-cpu-high .spark-dot {
-	stroke: #ef5350;
-	fill: #ef5350;
-}
-
-.pgdb-widget__host-metric.is-cpu-high .spark-area {
-	fill: #ef5350;
-}
-
-.pgdb-widget__ring.is-active .pgdb-widget__ring-btn {
-	border-color: #00bde8;
-	background: linear-gradient(180deg, #d7f6ff 0%, #9fe7f7 52%, #c7f1fb 100%);
-	font-weight: 600;
-	box-shadow:
-		inset 0 0 0 2px rgba(0, 189, 232, 0.34),
-		0 0 0 1px rgba(0, 189, 232, 0.56);
-}
-
-.pgdb-widget__error {
-	padding: 8px 10px;
-	border-radius: 4px;
-	background: rgba(192, 57, 43, 0.12);
-	color: #8e2d23;
-	font-size: 12px;
-	min-height: 0;
-}
-
-/* ── Sparkline cards ── */
+/* ── Cards ── */
 .pgdb-widget__cards {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -195,275 +115,36 @@
 }
 
 .pgdb-widget__card {
-	position: relative;
 	border: 1px solid rgba(120, 130, 140, 0.22);
 	border-radius: 8px;
 	padding: 10px 10px 6px 10px;
 	background: rgba(20, 26, 32, 0.04);
-	overflow: hidden;
 	display: flex;
 	flex-direction: column;
-	gap: 0;
-	transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.pgdb-widget__card:hover {
-	border-color: rgba(0, 189, 232, 0.4);
-	box-shadow: 0 0 0 1px rgba(0, 189, 232, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .pgdb-widget__metric-title {
 	font-size: 10px;
-	font-weight: 500;
-	letter-spacing: 0.03em;
 	text-transform: uppercase;
 	opacity: 0.6;
-	line-height: 1.2;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 .pgdb-widget__metric-value {
-	margin-top: 3px;
 	font-size: 18px;
 	font-weight: 700;
-	line-height: 1.1;
-	letter-spacing: -0.01em;
 }
 
-/* Sparkline SVG container */
-.pgdb-widget__sparkline {
-	margin-top: 6px;
-	width: 100%;
-	height: 28px;
-	display: block;
-	overflow: hidden;
-}
+/* Kleuren thema's op basis van data-theme (alleen kleur opgeven, opacity komt van boven) */
+.pgdb-widget__card[data-theme="blue"]   { color: #0288d1; }
+.pgdb-widget__card[data-theme="green"]  { color: #00796b; }
+.pgdb-widget__card[data-theme="orange"] { color: #e65100; }
+.pgdb-widget__card[data-theme="red"]    { color: #c62828; }
+.pgdb-widget__card[data-theme="purple"] { color: #6a1b9a; }
+.pgdb-widget__card[data-theme="teal"]   { color: #00838f; }
 
-.pgdb-widget__sparkline .spark-area {
-	opacity: 0.12;
-}
-
-.pgdb-widget__sparkline .spark-line {
-	fill: none;
-	stroke-width: 1.5;
-	stroke-linecap: round;
-	stroke-linejoin: round;
-}
-
-.pgdb-widget__sparkline .spark-dot {
-	r: 2.5;
-}
-
-/* Color themes per metric type — metric-value colours + sparkline colours */
-.pgdb-widget__card[data-theme="blue"] .pgdb-widget__metric-value {
-	color: #0288d1;
-}
-
-.pgdb-widget__card[data-theme="blue"] .spark-line,
-.pgdb-widget__card[data-theme="blue"] .spark-dot {
-	stroke: #0288d1;
-	fill: #0288d1;
-}
-
-.pgdb-widget__card[data-theme="blue"] .spark-area {
-	fill: #0288d1;
-}
-
-.pgdb-widget__card[data-theme="green"] .pgdb-widget__metric-value {
-	color: #00796b;
-}
-
-.pgdb-widget__card[data-theme="green"] .spark-line,
-.pgdb-widget__card[data-theme="green"] .spark-dot {
-	stroke: #00796b;
-	fill: #00796b;
-}
-
-.pgdb-widget__card[data-theme="green"] .spark-area {
-	fill: #00796b;
-}
-
-.pgdb-widget__card[data-theme="orange"] .pgdb-widget__metric-value {
-	color: #e65100;
-}
-
-.pgdb-widget__card[data-theme="orange"] .spark-line,
-.pgdb-widget__card[data-theme="orange"] .spark-dot {
-	stroke: #e65100;
-	fill: #e65100;
-}
-
-.pgdb-widget__card[data-theme="orange"] .spark-area {
-	fill: #e65100;
-}
-
-.pgdb-widget__card[data-theme="red"] .pgdb-widget__metric-value {
-	color: #c62828;
-}
-
-.pgdb-widget__card[data-theme="red"] .spark-line,
-.pgdb-widget__card[data-theme="red"] .spark-dot {
-	stroke: #c62828;
-	fill: #c62828;
-}
-
-.pgdb-widget__card[data-theme="red"] .spark-area {
-	fill: #c62828;
-}
-
-.pgdb-widget__card[data-theme="purple"] .pgdb-widget__metric-value {
-	color: #6a1b9a;
-}
-
-.pgdb-widget__card[data-theme="purple"] .spark-line,
-.pgdb-widget__card[data-theme="purple"] .spark-dot {
-	stroke: #6a1b9a;
-	fill: #6a1b9a;
-}
-
-.pgdb-widget__card[data-theme="purple"] .spark-area {
-	fill: #6a1b9a;
-}
-
-.pgdb-widget__card[data-theme="teal"] .pgdb-widget__metric-value {
-	color: #00838f;
-}
-
-.pgdb-widget__card[data-theme="teal"] .spark-line,
-.pgdb-widget__card[data-theme="teal"] .spark-dot {
-	stroke: #00838f;
-	fill: #00838f;
-}
-
-.pgdb-widget__card[data-theme="teal"] .spark-area {
-	fill: #00838f;
-}
-
-/* Dark-theme overrides */
+/* Dark mode basic support */
 @media (prefers-color-scheme: dark) {
-	.pgdb-widget__card[data-theme="blue"] .pgdb-widget__metric-value {
-		color: #81d4fa;
-	}
-
-	.pgdb-widget__card[data-theme="blue"] .spark-line,
-	.pgdb-widget__card[data-theme="blue"] .spark-dot {
-		stroke: #81d4fa;
-		fill: #81d4fa;
-	}
-
-	.pgdb-widget__card[data-theme="blue"] .spark-area {
-		fill: #81d4fa;
-	}
-
-	.pgdb-widget__card[data-theme="green"] .pgdb-widget__metric-value {
-		color: #80cbc4;
-	}
-
-	.pgdb-widget__card[data-theme="green"] .spark-line,
-	.pgdb-widget__card[data-theme="green"] .spark-dot {
-		stroke: #80cbc4;
-		fill: #80cbc4;
-	}
-
-	.pgdb-widget__card[data-theme="green"] .spark-area {
-		fill: #80cbc4;
-	}
-
-	.pgdb-widget__card[data-theme="orange"] .pgdb-widget__metric-value {
-		color: #ffcc80;
-	}
-
-	.pgdb-widget__card[data-theme="orange"] .spark-line,
-	.pgdb-widget__card[data-theme="orange"] .spark-dot {
-		stroke: #ffcc80;
-		fill: #ffcc80;
-	}
-
-	.pgdb-widget__card[data-theme="orange"] .spark-area {
-		fill: #ffcc80;
-	}
-
-	.pgdb-widget__card[data-theme="red"] .pgdb-widget__metric-value {
-		color: #ef9a9a;
-	}
-
-	.pgdb-widget__card[data-theme="red"] .spark-line,
-	.pgdb-widget__card[data-theme="red"] .spark-dot {
-		stroke: #ef9a9a;
-		fill: #ef9a9a;
-	}
-
-	.pgdb-widget__card[data-theme="red"] .spark-area {
-		fill: #ef9a9a;
-	}
-
-	.pgdb-widget__card[data-theme="purple"] .pgdb-widget__metric-value {
-		color: #ce93d8;
-	}
-
-	.pgdb-widget__card[data-theme="purple"] .spark-line,
-	.pgdb-widget__card[data-theme="purple"] .spark-dot {
-		stroke: #ce93d8;
-		fill: #ce93d8;
-	}
-
-	.pgdb-widget__card[data-theme="purple"] .spark-area {
-		fill: #ce93d8;
-	}
-
-	.pgdb-widget__card[data-theme="teal"] .pgdb-widget__metric-value {
-		color: #80deea;
-	}
-
-	.pgdb-widget__card[data-theme="teal"] .spark-line,
-	.pgdb-widget__card[data-theme="teal"] .spark-dot {
-		stroke: #80deea;
-		fill: #80deea;
-	}
-
-	.pgdb-widget__card[data-theme="teal"] .spark-area {
-		fill: #80deea;
-	}
-
-	.pgdb-widget__card {
-		background: rgba(255, 255, 255, 0.03);
-		border-color: rgba(255, 255, 255, 0.1);
-	}
-
-	.pgdb-widget__host-metric {
-		background: rgba(255, 255, 255, 0.03);
-		border-color: rgba(255, 255, 255, 0.1);
-	}
-}
-
-@media (max-width: 900px) {
-	.pgdb-widget__header {
-		grid-template-columns: 1fr;
-		row-gap: 8px;
-	}
-
-	.pgdb-widget__visual {
-		min-height: 148px;
-		border-right: 0;
-		padding-right: 0;
-	}
-
-	.pgdb-widget__rings {
-		left: 114px;
-		top: 40px;
-		width: clamp(165px, 45vw, 230px);
-		gap: 5px;
-	}
-
-	.pgdb-widget__host-metrics {
-		grid-template-columns: 1fr;
-		padding: 4px 0 8px 0;
-	}
-
-	.pgdb-widget__icon {
-		width: 146px;
-		height: 136px;
-	}
+	.pgdb-widget__card { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
+	.pgdb-widget__card[data-theme="blue"] { color: #81d4fa; }
+	.pgdb-widget__card[data-theme="green"] { color: #80cbc4; }
 }
