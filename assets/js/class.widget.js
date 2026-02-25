@@ -52,24 +52,24 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		// Metric Dictionary voor Tooltips
 		const metricDictionary = {
-			active_connections: "Total number of established connections to the database cluster.",
-			wal_write: "Rate of data written to the Write-Ahead Log. High values indicate heavy write activity.",
-			wal_receive: "Rate of WAL data received from the primary (on standby nodes).",
-			wal_count: "Number of WAL segments currently in the pg_wal directory.",
-			db_size: "Total disk space occupied by the database files.",
-			backends: "Number of active server processes for this specific database.",
-			temp_bytes_rate: "Amount of temporary data written to disk (due to work_mem being too low for sorts/joins).",
-			commit_rate: "Number of successful transactions per second.",
-			rollback_rate: "Number of failed/aborted transactions per second. Keep this low.",
-			locks_total: "Number of active locks. Excessive locking can indicate concurrency issues.",
-			deadlocks_rate: "Frequency of deadlock situations where transactions block each other.",
-			slow_queries: "Queries exceeding the defined execution time threshold.",
-			cache_hit: "Percentage of data blocks found in shared buffers vs. read from disk. Ideal > 95%.",
-			replication_lag: "Delay between the primary server and this standby in seconds.",
-			bloat: "Estimated wasted space in tables/indexes caused by updates and deletes.",
-			xid_age: "Age of the oldest transaction ID. If this hits 2 billion, the DB enters read-only mode!",
-			checkpoint_req: "Checkpoints requested manually or by WAL volume. Too many indicate max_wal_size is too low.",
-			checkpoint_sch: "Checkpoints occurring on a regular schedule (Time-based). This is the preferred way."
+            active_connections: "Total established connections to the cluster. If consistently near max_connections, expect saturation (queueing/timeouts); consider pooling (PgBouncer) or reducing connection usage.",
+            backends: "Active server processes for this database. High values can reflect workload; watch for many idle-in-transaction sessions or long-running queries.",
+            db_size: "Total on-disk size of the database. Track growth trends and ensure disk/backup capacity keeps up.",
+            wal_write: "WAL write rate on the primary. High values mean heavy write activity and can increase I/O pressure and checkpoint/WAL volume.",
+  			wal_receive: "WAL receive rate on a standby. Helps confirm the standby is streaming and keeping up with primary WAL traffic.",
+  			wal_count: "Number of WAL segments currently in pg_wal. Spikes can indicate slow archiving/replication, low max_wal_size, or a replication slot preventing removal.",
+  			temp_bytes_rate: "Temporary bytes written to disk (sort/hash spill). High values often mean work_mem is too low for query patterns or queries need optimization.",
+  			commit_rate: "Committed transactions per second. Useful as a throughput indicator; interpret alongside latency and resource usage.",
+  			rollback_rate: "Rolled-back transactions per second. Persistently high values often indicate application errors, retries, or serialization/deadlock handling.",
+  			locks_total: "Current number of locks. High counts are normal under load, but sudden spikes plus slow queries can indicate blocking/lock contention.",
+  			deadlocks_rate: "Deadlocks per time unit (circular waits). Any non-trivial rate suggests inconsistent lock ordering or conflicting transaction patterns.",
+  			slow_queries: "Queries exceeding the configured duration threshold. Use this to trigger investigation (EXPLAIN, indexing, query/plan changes).",
+  			cache_hit: "Buffer cache hit ratio (shared_buffers hits vs disk reads). Higher is generally better, but drops can be normal after restarts or with large working sets.",
+  			replication_lag: "Standby apply/receive lag in seconds vs primary (definition depends on your query). Sustained lag risks stale reads and longer failover catch-up.",
+  			bloat: "Estimated wasted space from updates/deletes (tables/indexes). High bloat increases I/O and cache pressure; consider VACUUM tuning or REINDEX for indexes.",
+  			xid_age: "Age of the oldest transaction ID. CRITICAL: approaching ~2 billion risks transaction ID wraparound and forced read-only; check long-running transactions and autovacuum.",
+  			checkpoint_req: "Checkpoints triggered by WAL volume or explicit requests. Frequent checkpoints can cause I/O spikes; often improved by increasing max_wal_size and tuning checkpoint settings.",
+  			checkpoint_sch: "Time-based (scheduled) checkpoints. Generally preferable to volume-triggered bursts; tune checkpoint_timeout and checkpoint_completion_target to smooth I/O."
 		};
 
 		var databases = Array.isArray(model.databases) ? model.databases : [];
