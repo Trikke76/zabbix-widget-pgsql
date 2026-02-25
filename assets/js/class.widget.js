@@ -157,7 +157,8 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 				card.setAttribute('data-theme', metricThemes[spec.key] || 'blue');
 
 				// Tooltip toevoegen
-				card.setAttribute('title', metricDictionary[spec.key] || '');
+				const tip = metricDictionary[spec.key];
+				if (tip) card.setAttribute('data-tooltip', tip);
 
 				card.innerHTML = `<div class="pgdb-widget__metric-title">${spec.title}</div>
 								  <div class="pgdb-widget__metric-value">${self._formatValue(metric ? metric.value : null, metric ? metric.units : null)}</div>`;
@@ -185,6 +186,31 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		});
 
 		draw(selected);
+
+		// ── Tooltip positie berekening ──
+		cards.addEventListener('mousemove', function(e) {
+			var card = e.target.closest('.pgdb-widget__card');
+			if (!card || !card.dataset.tooltip) return;
+
+			var vw = window.innerWidth;
+			var tooltipW = 240;
+			var margin = 10;
+
+			var x = e.clientX;
+			var y = e.clientY;
+
+			var left = x + margin;
+			if (left + tooltipW > vw - margin) {
+				left = x - tooltipW - margin;
+			}
+			if (left < margin) left = margin;
+
+			var top = y - 80;
+			if (top < margin) top = y + margin;
+
+			card.style.setProperty('--tt-top', top + 'px');
+			card.style.setProperty('--tt-left', left + 'px');
+		});
 	}
 
 	_buildSparkline(history) {
