@@ -46,7 +46,8 @@ $pgtune = (new CTag('a', true, '🔧 pgtune'))
 	->setAttribute('rel', 'noopener noreferrer')
 	->addClass('pgdb-widget__pgtune-link');
 
-$visual->addItem([$icon, $rings, $pgtune]);
+$health = (new CDiv())->addClass('pgdb-widget__health js-pgdb-health');
+$visual->addItem([$icon, $rings, $health, $pgtune]);
 
 $host_metrics = (new CDiv())->addClass('pgdb-widget__host-metrics js-pgdb-host-metrics');
 $header->addItem([$visual, $host_metrics]);
