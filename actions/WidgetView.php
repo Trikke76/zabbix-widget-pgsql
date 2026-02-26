@@ -26,13 +26,13 @@ class WidgetView extends CControllerDashboardWidgetView
 	];
 
 	private const CLUSTER_METRICS = [
-		'pgsql.connections.sum.active'              => 'active_connections',
+		'pgsql.connections.sum.total_pct'           => 'active_connections',
 		'pgsql.wal.write'                           => 'wal_write',
 		'pgsql.wal.receive'                         => 'wal_receive',
 		'pgsql.wal.count'                           => 'wal_count',
 		'pgsql.cache.hit'                           => 'cache_hit',
-		'pgsql.transactions.xid_age'                => 'xid_age',
-		'pgsql.checkpoint.avg_write_time'           => 'checkpoint_write_time',
+		'pgsql.connections.sum.idle_in_transaction' => 'idle_in_transaction',
+		'pgsql.bgwriter.checkpoint_write_time.rate' => 'checkpoint_write_time',
 	];
 
 	/**
@@ -40,8 +40,8 @@ class WidgetView extends CControllerDashboardWidgetView
 	 * These are matched with strpos instead of exact key match.
 	 */
 	private const CLUSTER_METRICS_PREFIX = [
-		'pgsql.replication.lag.sec['                => 'replication_lag',
-		'pgsql.connections.status[idle_in_transaction' => 'idle_in_transaction',
+		'pgsql.replication.lag.sec['  => 'replication_lag',
+		'pgsql.oldest.xid['           => 'xid_age',
 	];
 
 	protected function doAction(): void
@@ -320,14 +320,14 @@ class WidgetView extends CControllerDashboardWidgetView
 
 	private function buildClusterMetricsMaps(array $fields): array
 	{
-		// Exact-match overrides
+		// Exact-match overrides (keys without macro parameters)
 		$exact_overrides = [
 			'key_active_connections'    => 'active_connections',
 			'key_wal_write'             => 'wal_write',
 			'key_wal_receive'           => 'wal_receive',
 			'key_wal_count'             => 'wal_count',
 			'key_cache_hit'             => 'cache_hit',
-			'key_xid_age'               => 'xid_age',
+			'key_idle_in_transaction'   => 'idle_in_transaction',
 			'key_checkpoint_write_time' => 'checkpoint_write_time',
 		];
 		$exact_map = [];
@@ -339,10 +339,10 @@ class WidgetView extends CControllerDashboardWidgetView
 			}
 		}
 
-		// Prefix-match overrides
+		// Prefix-match overrides (dependent items with connstring macro in key)
 		$prefix_overrides = [
-			'key_replication_lag'       => 'replication_lag',
-			'key_idle_in_transaction'   => 'idle_in_transaction',
+			'key_replication_lag' => 'replication_lag',
+			'key_xid_age'         => 'xid_age',
 		];
 		$prefix_map = [];
 		foreach ($prefix_overrides as $field_name => $alias) {
@@ -351,8 +351,8 @@ class WidgetView extends CControllerDashboardWidgetView
 			if ($prefix === '') {
 				continue;
 			}
-			// Voeg [ toe als het er nog niet aan staat (prefix-match items)
-			if (substr($prefix, -1) !== '[' && strpos($prefix, '[') === false) {
+			// Voeg [ toe als het er nog niet aan staat
+			if (substr($prefix, -1) !== '[') {
 				$prefix .= '[';
 			}
 			$prefix_map[$prefix] = $alias;
