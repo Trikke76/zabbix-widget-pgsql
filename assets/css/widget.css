@@ -21,9 +21,9 @@
 }
 .pgdb-widget__rings {
 	position: absolute;
-	left: 150px;
+	left: 130px;
 	top: 54px;
-	width: clamp(140px, 18vw, 190px);
+	width: clamp(110px, 14vw, 150px);
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -32,8 +32,9 @@
 	list-style: none;
 }
 .pgdb-widget__icon {
-	width: 172px;
-	height: 170px;
+	width: 148px;
+	height: 146px;
+	margin-left: -8px;
 	object-fit: cover;
 	object-position: center 52%;
 	filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.14));
@@ -182,8 +183,8 @@
 .pgdb-widget__pgtune-link {
 	position: absolute;
 	bottom: 6px;
-	left: 0;
-	width: 172px;
+	left: -8px;
+	width: 148px;
 	text-align: center;
 	font-size: 10px;
 	color: rgba(160, 180, 200, 0.6);
@@ -244,7 +245,7 @@
 /* ── Health score ── */
 .pgdb-widget__health {
 	position: absolute;
-	left: 340px;
+	left: 295px;
 	top: 6px;
 	display: flex;
 	flex-direction: column;
