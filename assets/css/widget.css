@@ -7,7 +7,7 @@
 }
 .pgdb-widget__header {
 	display: grid;
-	grid-template-columns: minmax(420px, 520px) minmax(230px, 1fr);
+	grid-template-columns: minmax(440px, 480px) minmax(230px, 1fr);
 	align-items: start;
 	column-gap: 18px;
 }
@@ -23,7 +23,7 @@
 	position: absolute;
 	left: 150px;
 	top: 54px;
-	width: clamp(180px, 24vw, 250px);
+	width: clamp(140px, 18vw, 190px);
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -239,4 +239,73 @@
 }
 .pgdb-widget__card:hover::after {
 	opacity: 1;
+}
+
+/* ── Health score ── */
+.pgdb-widget__health {
+	position: absolute;
+	left: 340px;
+	top: 6px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 8px;
+	gap: 1px;
+	width: 130px;
+}
+.pgdb-widget__health-title {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.5;
+	margin-bottom: 2px;
+}
+.pgdb-widget__health-score {
+	font-size: 34px;
+	font-weight: 800;
+	line-height: 1;
+	letter-spacing: -1px;
+}
+.pgdb-widget__health-label {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	margin-bottom: 8px;
+}
+.pgdb-widget__health-cats {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: 100%;
+}
+.pgdb-widget__health-cat {
+	display: grid;
+	grid-template-columns: 68px 1fr 22px;
+	align-items: center;
+	gap: 4px;
+}
+.pgdb-widget__health-cat-label {
+	font-size: 9px;
+	opacity: 0.65;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.pgdb-widget__health-cat-bar {
+	height: 4px;
+	background: rgba(255,255,255,0.08);
+	border-radius: 2px;
+	overflow: hidden;
+}
+.pgdb-widget__health-cat-fill {
+	height: 100%;
+	border-radius: 2px;
+	transition: width 0.4s ease;
+}
+.pgdb-widget__health-cat-score {
+	font-size: 9px;
+	font-weight: 700;
+	text-align: right;
 }
