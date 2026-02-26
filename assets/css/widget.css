@@ -55,6 +55,7 @@
 	background: linear-gradient(180deg, #d7f6ff 0%, #9fe7f7 52%, #c7f1fb 100%);
 	font-weight: 600;
 }
+
 /* ── Host metrics ── */
 .pgdb-widget__host-metrics {
 	display: grid;
@@ -80,14 +81,14 @@
 	color: #ef5350;
 	border-color: rgba(230, 126, 34, 0.65);
 }
-/* ── Sparkline Basic Styling ── */
+
+/* ── Sparkline ── */
 .pgdb-widget__sparkline {
 	margin-top: 6px;
 	width: 100%;
 	height: 28px;
 	display: block;
 }
-/* De vulling: ALTIJD transparant, ongeacht de kleur */
 .pgdb-widget__sparkline .spark-area {
 	fill: currentColor;
 	fill-opacity: 0.12 !important;
@@ -103,13 +104,23 @@
 .pgdb-widget__sparkline .spark-dot {
 	fill: currentColor;
 }
-/* ── Cards ── */
+
+/* ── Cards grid ── */
 .pgdb-widget__cards {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	gap: 8px;
 	padding: 4px 8px 10px 8px;
 }
+
+/* ── Klikbare card wrapper ── */
+.pgdb-widget__card-link {
+	display: contents;
+	text-decoration: none;
+	color: inherit;
+}
+
+/* ── Card ── */
 .pgdb-widget__card {
 	border: 1px solid rgba(120, 130, 140, 0.22);
 	border-radius: 8px;
@@ -117,7 +128,32 @@
 	background: rgba(20, 26, 32, 0.04);
 	display: flex;
 	flex-direction: column;
+	position: relative;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	cursor: default;
 }
+/* Hover effect alleen als de card in een link zit */
+.pgdb-widget__card-link:hover .pgdb-widget__card {
+	border-color: rgba(0, 189, 232, 0.55);
+	box-shadow: 0 0 0 2px rgba(0, 189, 232, 0.15);
+	cursor: pointer;
+}
+/* Klik-icoon rechtsboven */
+.pgdb-widget__card-link .pgdb-widget__card::before {
+	content: '\2197';
+	position: absolute;
+	top: 5px;
+	right: 7px;
+	font-size: 10px;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	color: rgba(0, 189, 232, 0.8);
+	pointer-events: none;
+}
+.pgdb-widget__card-link:hover .pgdb-widget__card::before {
+	opacity: 1;
+}
+
 .pgdb-widget__metric-title {
 	font-size: 10px;
 	text-transform: uppercase;
@@ -127,14 +163,49 @@
 	font-size: 18px;
 	font-weight: 700;
 }
-/* Kleuren thema's op basis van data-theme (alleen kleur opgeven, opacity komt van boven) */
+
+/* ── XID Age progress bar ── */
+.pgdb-widget__xid-bar {
+	margin-top: 5px;
+	height: 4px;
+	background: rgba(255,255,255,0.1);
+	border-radius: 2px;
+	overflow: hidden;
+}
+.pgdb-widget__xid-bar-fill {
+	height: 100%;
+	border-radius: 2px;
+	transition: width 0.3s ease;
+}
+
+/* ── pgtune link ── */
+.pgdb-widget__pgtune {
+	grid-column: 1 / -1;
+	padding: 6px 4px 2px 4px;
+	font-size: 11px;
+	opacity: 0.55;
+	transition: opacity 0.15s ease;
+}
+.pgdb-widget__pgtune:hover {
+	opacity: 1;
+}
+.pgdb-widget__pgtune a {
+	color: inherit;
+	text-decoration: none;
+}
+.pgdb-widget__pgtune a:hover {
+	text-decoration: underline;
+}
+
+/* ── Kleur thema's ── */
 .pgdb-widget__card[data-theme="blue"]   { color: #0288d1; }
 .pgdb-widget__card[data-theme="green"]  { color: #00796b; }
 .pgdb-widget__card[data-theme="orange"] { color: #e65100; }
 .pgdb-widget__card[data-theme="red"]    { color: #c62828; }
 .pgdb-widget__card[data-theme="purple"] { color: #6a1b9a; }
 .pgdb-widget__card[data-theme="teal"]   { color: #00838f; }
-/* Dark mode basic support */
+
+/* ── Dark mode ── */
 @media (prefers-color-scheme: dark) {
 	.pgdb-widget__card { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
 	.pgdb-widget__card[data-theme="blue"] { color: #81d4fa; }
@@ -142,33 +213,29 @@
 }
 
 /* ── Tooltip ── */
-.pgdb-widget__card {
-    position: relative;
-}
 .pgdb-widget__card::after {
-    content: attr(data-tooltip);
-    position: fixed;
-    background: #1a2330;
-    color: #e8edf2;
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1.5;
-    padding: 7px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.12);
-    width: 240px;
-    white-space: normal;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    z-index: 9999;
-    text-transform: none;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    /* Positionering via JS */
-    top: var(--tt-top, auto);
-    left: var(--tt-left, auto);
+	content: attr(data-tooltip);
+	position: fixed;
+	background: #1a2330;
+	color: #e8edf2;
+	font-size: 11px;
+	font-weight: 400;
+	line-height: 1.5;
+	padding: 7px 10px;
+	border-radius: 6px;
+	border: 1px solid rgba(255,255,255,0.12);
+	width: 240px;
+	white-space: normal;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	z-index: 9999;
+	text-transform: none;
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	top: var(--tt-top, auto);
+	left: var(--tt-left, auto);
 }
 .pgdb-widget__card:hover::after {
-    opacity: 1;
+	opacity: 1;
 }
