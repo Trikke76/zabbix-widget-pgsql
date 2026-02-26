@@ -10,6 +10,10 @@ $form->addField(new CWidgetFieldMultiSelectHostView($data['fields']['hostids']))
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['discovery_itemid']));
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['default_db']));
 
+// Zabbix graph links
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['zabbix_base_url']));
+$form->addField(new CWidgetFieldSelectView($data['fields']['graph_period']));
+
 // CPU thresholds
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['cpu_warn_threshold']));
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['cpu_high_threshold']));
@@ -48,6 +52,15 @@ $form->addField(new CWidgetFieldTextBoxView($data['fields']['key_cache_hit']));
 
 $form->addField(new CWidgetFieldSelectView($data['fields']['show_replication_lag']));
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['key_replication_lag']));
+
+$form->addField(new CWidgetFieldSelectView($data['fields']['show_xid_age']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['key_xid_age']));
+
+$form->addField(new CWidgetFieldSelectView($data['fields']['show_idle_in_transaction']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['key_idle_in_transaction']));
+
+$form->addField(new CWidgetFieldSelectView($data['fields']['show_checkpoint_write_time']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['key_checkpoint_write_time']));
 
 // Per-DB metrics
 $form->addField(new CWidgetFieldSelectView($data['fields']['show_db_size']));
