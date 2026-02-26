@@ -89,10 +89,10 @@ class WidgetForm extends CWidgetForm {
 			)
 
 			// ── Cluster metrics: show + item key override ─────────────────
-			->addField((new CWidgetFieldSelect('show_active_connections', _('Show active connections'), [0 => _('No'), 1 => _('Yes')]))->setDefault(1))
+			->addField((new CWidgetFieldSelect('show_active_connections', _('Show active connections (%)'), [0 => _('No'), 1 => _('Yes')]))->setDefault(1))
 			->addField(
 				(new CWidgetFieldTextBox('key_active_connections', _('Item key: active connections')))
-					->setDefault('pgsql.connections.sum.active')
+					->setDefault('pgsql.connections.sum.total_pct')
 					->setMaxLength(2048)
 			)
 
@@ -133,22 +133,22 @@ class WidgetForm extends CWidgetForm {
 
 			->addField((new CWidgetFieldSelect('show_xid_age', _('Show oldest XID age'), [0 => _('No'), 1 => _('Yes')]))->setDefault(1))
 			->addField(
-				(new CWidgetFieldTextBox('key_xid_age', _('Item key: XID age')))
-					->setDefault('pgsql.transactions.xid_age')
+				(new CWidgetFieldTextBox('key_xid_age', _('Item key prefix: XID age')))
+					->setDefault('pgsql.oldest.xid')
 					->setMaxLength(2048)
 			)
 
 			->addField((new CWidgetFieldSelect('show_idle_in_transaction', _('Show idle in transaction'), [0 => _('No'), 1 => _('Yes')]))->setDefault(1))
 			->addField(
 				(new CWidgetFieldTextBox('key_idle_in_transaction', _('Item key: idle in transaction')))
-					->setDefault('pgsql.connections.status[idle_in_transaction]')
+					->setDefault('pgsql.connections.sum.idle_in_transaction')
 					->setMaxLength(2048)
 			)
 
 			->addField((new CWidgetFieldSelect('show_checkpoint_write_time', _('Show checkpoint write time'), [0 => _('No'), 1 => _('Yes')]))->setDefault(1))
 			->addField(
-				(new CWidgetFieldTextBox('key_checkpoint_write_time', _('Item key: checkpoint avg write time')))
-					->setDefault('pgsql.checkpoint.avg_write_time')
+				(new CWidgetFieldTextBox('key_checkpoint_write_time', _('Item key: checkpoint write time (rate)')))
+					->setDefault('pgsql.bgwriter.checkpoint_write_time.rate')
 					->setMaxLength(2048)
 			)
 
