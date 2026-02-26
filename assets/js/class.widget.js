@@ -52,7 +52,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		// Metric Dictionary voor Tooltips
 		const metricDictionary = {
-			active_connections: "Total established connections to the cluster. If consistently near max_connections, expect saturation (queueing/timeouts); consider pooling (PgBouncer) or reducing connection usage.",
+			active_connections: "Active connections as % of max_connections. Consistently above 80% risks saturation — consider connection pooling (PgBouncer) or raising max_connections carefully.",
 			backends: "Active server processes for this database. High values can reflect workload; watch for many idle-in-transaction sessions or long-running queries.",
 			db_size: "Total on-disk size of the database. Track growth trends and ensure disk/backup capacity keeps up.",
 			wal_write: "WAL write rate on the primary. High values mean heavy write activity and can increase I/O pressure and checkpoint/WAL volume.",
@@ -154,7 +154,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		};
 
 		var orderedMetrics = [
-			{ key: 'active_connections', title: 'Active connections', source: 'cluster' },
+			{ key: 'active_connections', title: 'Active conn. %', source: 'cluster' },
 			{ key: 'wal_write', title: 'WAL write/s', source: 'cluster' },
 			{ key: 'db_size', title: 'Database size' },
 			{ key: 'backends', title: 'Active connections (DB)' },
@@ -218,15 +218,6 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 				var itemid = metric ? metric.itemid : null;
 				cards.appendChild(makeClickable(card, itemid));
 			});
-
-			// pgtune link onderaan de cards
-			var existing = cards.querySelector('.pgdb-widget__pgtune');
-			if (!existing) {
-				var pgtune = document.createElement('div');
-				pgtune.className = 'pgdb-widget__pgtune';
-				pgtune.innerHTML = `<a href="https://pgtune.leopard.in.ua/" target="_blank" rel="noopener noreferrer">🔧 pgtune — PostgreSQL configuratie optimalisatie</a>`;
-				cards.appendChild(pgtune);
-			}
 		}
 
 		function updateRings(activeDb) {
