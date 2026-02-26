@@ -52,24 +52,26 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		// Metric Dictionary voor Tooltips
 		const metricDictionary = {
-            active_connections: "Total established connections to the cluster. If consistently near max_connections, expect saturation (queueing/timeouts); consider pooling (PgBouncer) or reducing connection usage.",
-            backends: "Active server processes for this database. High values can reflect workload; watch for many idle-in-transaction sessions or long-running queries.",
-            db_size: "Total on-disk size of the database. Track growth trends and ensure disk/backup capacity keeps up.",
-            wal_write: "WAL write rate on the primary. High values mean heavy write activity and can increase I/O pressure and checkpoint/WAL volume.",
-  			wal_receive: "WAL receive rate on a standby. Helps confirm the standby is streaming and keeping up with primary WAL traffic.",
-  			wal_count: "Number of WAL segments currently in pg_wal. Spikes can indicate slow archiving/replication, low max_wal_size, or a replication slot preventing removal.",
-  			temp_bytes_rate: "Temporary bytes written to disk (sort/hash spill). High values often mean work_mem is too low for query patterns or queries need optimization.",
-  			commit_rate: "Committed transactions per second. Useful as a throughput indicator; interpret alongside latency and resource usage.",
-  			rollback_rate: "Rolled-back transactions per second. Persistently high values often indicate application errors, retries, or serialization/deadlock handling.",
-  			locks_total: "Current number of locks. High counts are normal under load, but sudden spikes plus slow queries can indicate blocking/lock contention.",
-  			deadlocks_rate: "Deadlocks per time unit (circular waits). Any non-trivial rate suggests inconsistent lock ordering or conflicting transaction patterns.",
-  			slow_queries: "Queries exceeding the configured duration threshold. Use this to trigger investigation (EXPLAIN, indexing, query/plan changes).",
-  			cache_hit: "Buffer cache hit ratio (shared_buffers hits vs disk reads). Higher is generally better, but drops can be normal after restarts or with large working sets.",
-  			replication_lag: "Standby apply/receive lag in seconds vs primary (definition depends on your query). Sustained lag risks stale reads and longer failover catch-up.",
-  			bloat: "Estimated wasted space from updates/deletes (tables/indexes). High bloat increases I/O and cache pressure; consider VACUUM tuning or REINDEX for indexes.",
-  			xid_age: "Age of the oldest transaction ID. CRITICAL: approaching ~2 billion risks transaction ID wraparound and forced read-only; check long-running transactions and autovacuum.",
-  			checkpoint_req: "Checkpoints triggered by WAL volume or explicit requests. Frequent checkpoints can cause I/O spikes; often improved by increasing max_wal_size and tuning checkpoint settings.",
-  			checkpoint_sch: "Time-based (scheduled) checkpoints. Generally preferable to volume-triggered bursts; tune checkpoint_timeout and checkpoint_completion_target to smooth I/O."
+			active_connections: "Total established connections to the cluster. If consistently near max_connections, expect saturation (queueing/timeouts); consider pooling (PgBouncer) or reducing connection usage.",
+			backends: "Active server processes for this database. High values can reflect workload; watch for many idle-in-transaction sessions or long-running queries.",
+			db_size: "Total on-disk size of the database. Track growth trends and ensure disk/backup capacity keeps up.",
+			wal_write: "WAL write rate on the primary. High values mean heavy write activity and can increase I/O pressure and checkpoint/WAL volume.",
+			wal_receive: "WAL receive rate on a standby. Helps confirm the standby is streaming and keeping up with primary WAL traffic.",
+			wal_count: "Number of WAL segments currently in pg_wal. Spikes can indicate slow archiving/replication, low max_wal_size, or a replication slot preventing removal.",
+			temp_bytes_rate: "Temporary bytes written to disk (sort/hash spill). High values often mean work_mem is too low for query patterns or queries need optimization.",
+			commit_rate: "Committed transactions per second. Useful as a throughput indicator; interpret alongside latency and resource usage.",
+			rollback_rate: "Rolled-back transactions per second. Persistently high values often indicate application errors, retries, or serialization/deadlock handling.",
+			locks_total: "Current number of locks. High counts are normal under load, but sudden spikes plus slow queries can indicate blocking/lock contention.",
+			deadlocks_rate: "Deadlocks per time unit (circular waits). Any non-trivial rate suggests inconsistent lock ordering or conflicting transaction patterns.",
+			slow_queries: "Queries exceeding the configured duration threshold. Use this to trigger investigation (EXPLAIN, indexing, query/plan changes).",
+			cache_hit: "Buffer cache hit ratio (shared_buffers hits vs disk reads). Higher is generally better, but drops can be normal after restarts or with large working sets.",
+			replication_lag: "Standby apply/receive lag in seconds vs primary (definition depends on your query). Sustained lag risks stale reads and longer failover catch-up.",
+			bloat: "Estimated wasted space from updates/deletes (tables/indexes). High bloat increases I/O and cache pressure; consider VACUUM tuning or REINDEX for indexes.",
+			xid_age: "Age of the oldest transaction ID. CRITICAL: approaching ~2 billion risks transaction ID wraparound and forced read-only; check long-running transactions and autovacuum.",
+			checkpoint_req: "Checkpoints triggered by WAL volume or explicit requests. Frequent checkpoints can cause I/O spikes; often improved by increasing max_wal_size and tuning checkpoint settings.",
+			checkpoint_sch: "Time-based (scheduled) checkpoints. Generally preferable to volume-triggered bursts; tune checkpoint_timeout and checkpoint_completion_target to smooth I/O.",
+			idle_in_transaction: "Connections sitting in an open transaction without activity. Even one persistent idle-in-transaction session can block VACUUM and hold locks, causing cascading slowdowns.",
+			checkpoint_write_time: "Average time (ms) spent writing data to disk during a checkpoint. Spikes indicate storage I/O saturation — consider faster disks, tuning checkpoint_completion_target, or reducing write load."
 		};
 
 		var databases = Array.isArray(model.databases) ? model.databases : [];
@@ -78,7 +80,31 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		var visibleMetricKeys = new Set(Array.isArray(model.visible_metric_keys) ? model.visible_metric_keys : []);
 		var visibleHostKeys = new Set(Array.isArray(model.visible_host_metric_keys) ? model.visible_host_metric_keys : []);
 
+		// Zabbix base URL + graph period configureerbaar via model
+		var zabbixBase = (model.zabbix_base_url || '').replace(/\/$/, '');
+		var graphPeriod = model.graph_period || '86400'; // default 24h in seconden
+
 		var self = this;
+
+		// Bouw Zabbix graph URL voor een itemid
+		function zabbixGraphUrl(itemid) {
+			if (!itemid || !zabbixBase) return null;
+			return zabbixBase + '/history.php?action=showgraph&itemids[]=' + itemid
+				+ '&from=now-' + graphPeriod + 's&to=now';
+		}
+
+		// Wrap een element in een <a> als de URL beschikbaar is
+		function makeClickable(el, itemid) {
+			var url = zabbixGraphUrl(itemid);
+			if (!url) return el;
+			var a = document.createElement('a');
+			a.href = url;
+			a.target = '_blank';
+			a.rel = 'noopener noreferrer';
+			a.className = 'pgdb-widget__card-link';
+			a.appendChild(el);
+			return a;
+		}
 
 		// ── Host metrics ──
 		var hostOrdered = [
@@ -108,19 +134,23 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 			var history = (metric && Array.isArray(metric.history)) ? metric.history : [];
 			row.appendChild(self._buildSparkline(history));
-			hostBox.appendChild(row);
+
+			// Klikbaar maken als itemid beschikbaar
+			var itemid = metric ? metric.itemid : null;
+			hostBox.appendChild(makeClickable(row, itemid));
 		});
 
 		// ── Database metrics ──
 		var preferred = (model.default_db || '').trim();
-		var selected = databases.some(db => db.name === preferred) ? preferred : databases[0].name;
+		var selected = databases.some(db => db.name === preferred) ? preferred : (databases[0] ? databases[0].name : '');
 
 		var metricThemes = {
 			active_connections: 'blue', wal_write: 'teal', wal_receive: 'teal', wal_count: 'teal',
 			db_size: 'green', backends: 'blue', temp_bytes_rate: 'purple', commit_rate: 'green',
 			rollback_rate: 'orange', locks_total: 'orange', deadlocks_rate: 'red',
 			slow_queries: 'red', cache_hit: 'green', replication_lag: 'orange', bloat: 'red',
-			xid_age: 'red', checkpoint_req: 'orange', checkpoint_sch: 'blue'
+			xid_age: 'red', checkpoint_req: 'orange', checkpoint_sch: 'blue',
+			idle_in_transaction: 'orange', checkpoint_write_time: 'orange'
 		};
 
 		var orderedMetrics = [
@@ -141,7 +171,9 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			{ key: 'bloat', title: 'Bloating tables' },
 			{ key: 'xid_age', title: 'Oldest XID Age', source: 'cluster' },
 			{ key: 'checkpoint_req', title: 'Checkpoint Req/s', source: 'cluster' },
-			{ key: 'checkpoint_sch', title: 'Checkpoint Sch/s', source: 'cluster' }
+			{ key: 'checkpoint_sch', title: 'Checkpoint Sch/s', source: 'cluster' },
+			{ key: 'idle_in_transaction', title: 'Idle in transaction', source: 'cluster' },
+			{ key: 'checkpoint_write_time', title: 'Checkpoint write (ms)', source: 'cluster' }
 		];
 
 		function draw(dbName) {
@@ -151,22 +183,50 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 			orderedMetrics.forEach(spec => {
 				if (visibleMetricKeys.size > 0 && !visibleMetricKeys.has(spec.key)) return;
-				var metric = spec.source === 'cluster' ? clusterMetrics[spec.key] : db.metrics[spec.key];
+				var metric = spec.source === 'cluster' ? clusterMetrics[spec.key] : (db ? db.metrics[spec.key] : null);
 				var card = document.createElement('div');
 				card.className = 'pgdb-widget__card';
 				card.setAttribute('data-theme', metricThemes[spec.key] || 'blue');
 
-				// Tooltip toevoegen
-				const tip = metricDictionary[spec.key];
+				// Tooltip
+				var tip = metricDictionary[spec.key];
 				if (tip) card.setAttribute('data-tooltip', tip);
 
+				// XID Age: progress bar + kleur op basis van drempelwaarden
+				var extraHtml = '';
+				if (spec.key === 'xid_age' && metric && metric.value !== null) {
+					var xidVal = Number(metric.value);
+					var xidMax = 2000000000;
+					var xidWarn = 100000000;
+					var xidCrit = 150000000;
+					var xidPct = Math.min(100, (xidVal / xidMax) * 100);
+					var xidColor = xidVal >= xidCrit ? '#c62828' : xidVal >= xidWarn ? '#e65100' : '#00796b';
+					card.setAttribute('data-theme', xidVal >= xidCrit ? 'red' : xidVal >= xidWarn ? 'orange' : 'green');
+					extraHtml = `<div class="pgdb-widget__xid-bar" title="${xidVal.toLocaleString()} / 2 billion">
+						<div class="pgdb-widget__xid-bar-fill" style="width:${xidPct.toFixed(1)}%;background:${xidColor}"></div>
+					</div>`;
+				}
+
 				card.innerHTML = `<div class="pgdb-widget__metric-title">${spec.title}</div>
-								  <div class="pgdb-widget__metric-value">${self._formatValue(metric ? metric.value : null, metric ? metric.units : null)}</div>`;
+								  <div class="pgdb-widget__metric-value">${self._formatValue(metric ? metric.value : null, metric ? metric.units : null)}</div>
+								  ${extraHtml}`;
 
 				var history = (metric && Array.isArray(metric.history)) ? metric.history : [];
 				card.appendChild(self._buildSparkline(history));
-				cards.appendChild(card);
+
+				// Klikbaar naar Zabbix graph
+				var itemid = metric ? metric.itemid : null;
+				cards.appendChild(makeClickable(card, itemid));
 			});
+
+			// pgtune link onderaan de cards
+			var existing = cards.querySelector('.pgdb-widget__pgtune');
+			if (!existing) {
+				var pgtune = document.createElement('div');
+				pgtune.className = 'pgdb-widget__pgtune';
+				pgtune.innerHTML = `<a href="https://pgtune.leopard.in.ua/" target="_blank" rel="noopener noreferrer">🔧 pgtune — PostgreSQL configuratie optimalisatie</a>`;
+				cards.appendChild(pgtune);
+			}
 		}
 
 		function updateRings(activeDb) {
@@ -185,7 +245,7 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			rings.appendChild(li);
 		});
 
-		draw(selected);
+		if (selected) draw(selected);
 
 		// ── Tooltip positie berekening ──
 		cards.addEventListener('mousemove', function(e) {
