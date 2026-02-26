@@ -39,7 +39,14 @@ $icon = (new CTag('img'))
 
 $rings = (new CTag('ul', true))
 	->addClass('pgdb-widget__rings js-pgdb-rings');
-$visual->addItem([$icon, $rings]);
+
+$pgtune = (new CTag('a', true, '🔧 pgtune'))
+	->setAttribute('href', 'https://pgtune.leopard.in.ua/')
+	->setAttribute('target', '_blank')
+	->setAttribute('rel', 'noopener noreferrer')
+	->addClass('pgdb-widget__pgtune-link');
+
+$visual->addItem([$icon, $rings, $pgtune]);
 
 $host_metrics = (new CDiv())->addClass('pgdb-widget__host-metrics js-pgdb-host-metrics');
 $header->addItem([$visual, $host_metrics]);
