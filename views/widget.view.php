@@ -16,6 +16,8 @@ $payload = [
 	'cpu_warn_threshold'       => $data['cpu_warn_threshold'] ?? 1.00,
 	'cpu_high_threshold'       => $data['cpu_high_threshold'] ?? 2.00,
 	'default_db'               => $data['default_db'] ?? '',
+	'zabbix_base_url'          => $data['zabbix_base_url'] ?? '',
+	'graph_period'             => $data['graph_period'] ?? '86400',
 	'error'                    => $data['error'] ?? null,
 	'icon_url'                 => $asset_base . '/img/postgres-icon-24.svg'
 ];
