@@ -14,6 +14,17 @@ $form->addField(new CWidgetFieldTextBoxView($data['fields']['default_db']));
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['zabbix_base_url']));
 $form->addField(new CWidgetFieldSelectView($data['fields']['graph_period']));
 
+// Alert severity
+$form->addField(new CWidgetFieldSelectView($data['fields']['alert_severity']));
+
+// Health score weights
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['health_weight_connectivity']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['health_weight_integriteit']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['health_weight_stabiliteit']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['health_weight_efficiency']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['health_weight_replication']));
+$form->addField(new CWidgetFieldTextBoxView($data['fields']['health_weight_bloat']));
+
 // CPU thresholds
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['cpu_warn_threshold']));
 $form->addField(new CWidgetFieldTextBoxView($data['fields']['cpu_high_threshold']));
