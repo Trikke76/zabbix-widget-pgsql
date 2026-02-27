@@ -29,14 +29,14 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 
 		var errorBox  = root.querySelector('.js-pgdb-error');
 		var cards     = root.querySelector('.js-pgdb-cards');
-		var rings     = root.querySelector('.js-pgdb-rings');
+		var dbSelect  = root.querySelector('.js-pgdb-db-select');
 		var hostBox   = root.querySelector('.js-pgdb-host-metrics');
 		var healthBox = root.querySelector('.js-pgdb-health');
 
-		if (!errorBox || !cards || !rings || !hostBox) return;
+		if (!errorBox || !cards || !dbSelect || !hostBox) return;
 
 		try {
-			this._renderInner(model, errorBox, cards, rings, hostBox, healthBox, root);
+			this._renderInner(model, errorBox, cards, dbSelect, hostBox, healthBox, root);
 		} catch (e) {
 			console.error('[PgsqlClusterWidget] _renderInner error:', e);
 			errorBox.textContent = 'Widget render error: ' + e.message;
@@ -262,11 +262,11 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		healthBox.appendChild(catsEl);
 	}
 
-	_renderInner(model, errorBox, cards, rings, hostBox, healthBox, root) {
+	_renderInner(model, errorBox, cards, dbSelect, hostBox, healthBox, root) {
 		errorBox.textContent = '';
-		cards.innerHTML  = '';
-		rings.innerHTML  = '';
-		hostBox.innerHTML = '';
+		cards.innerHTML   = '';
+		dbSelect.innerHTML = '';
+		hostBox.innerHTML  = '';
 		if (healthBox) healthBox.innerHTML = '';
 
 		if (model.error) { errorBox.textContent = model.error; return; }
@@ -399,7 +399,6 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		function draw(dbName) {
 			cards.innerHTML = '';
 			var db = databases.find(d => d.name === dbName) || databases[0];
-			updateRings(dbName);
 
 			if (healthBox) {
 				var health = self._calcHealth(clusterMetrics, db ? db.metrics : {}, healthWeights);
@@ -460,21 +459,17 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 			});
 		}
 
-		function updateRings(activeDb) {
-			rings.querySelectorAll('.pgdb-widget__ring').forEach(r =>
-				r.classList.toggle('is-active', r.dataset.dbName === activeDb));
-		}
-
+		// Populate dropdown with database options
 		databases.forEach(function(db) {
-			var li  = document.createElement('li');
-			li.className = 'pgdb-widget__ring';
-			li.dataset.dbName = db.name;
-			var btn = document.createElement('button');
-			btn.className   = 'pgdb-widget__ring-btn';
-			btn.textContent = db.name;
-			btn.onclick = function() { draw(db.name); };
-			li.appendChild(btn);
-			rings.appendChild(li);
+			var opt = document.createElement('option');
+			opt.value       = db.name;
+			opt.textContent = db.name;
+			if (db.name === selected) opt.selected = true;
+			dbSelect.appendChild(opt);
+		});
+
+		dbSelect.addEventListener('change', function() {
+			draw(dbSelect.value);
 		});
 
 		if (selected) draw(selected);
