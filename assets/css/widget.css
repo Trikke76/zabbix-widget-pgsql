@@ -12,49 +12,60 @@
 	column-gap: 18px;
 }
 .pgdb-widget__visual {
-	position: relative;
 	display: flex;
-	align-items: center;
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 16px;
 	min-height: 186px;
 	padding-right: 14px;
 	border-right: 1px solid rgba(139, 152, 163, 0.28);
 }
-.pgdb-widget__rings {
-	position: absolute;
-	left: 130px;
-	top: 54px;
-	width: clamp(110px, 14vw, 150px);
+/* ── Icon wrap: column layout voor icon + dropdown + pgtune ── */
+.pgdb-widget__icon-wrap {
 	display: flex;
 	flex-direction: column;
+	align-items: center;
 	gap: 6px;
-	margin: 0;
-	padding: 0;
-	list-style: none;
+	width: 148px;
+	flex-shrink: 0;
+	padding: 0 10px;
+	box-sizing: content-box;
 }
 .pgdb-widget__icon {
 	width: 148px;
 	height: 146px;
-	margin-left: -8px;
 	object-fit: cover;
 	object-position: center 52%;
 	filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.14));
 }
-.pgdb-widget__ring-btn {
+/* ── Database dropdown ── */
+.pgdb-widget__db-select {
 	width: 100%;
-	text-align: left;
-	border: 1px solid #a4adb6;
-	border-radius: 999px;
-	padding: 4px 11px;
+	padding: 5px 8px;
 	font-size: 12px;
-	min-height: 34px;
-	background: linear-gradient(180deg, #f3f5f7 0%, #cdd3d8 52%, #e0e5e9 100%);
-	color: #27313a;
+	font-family: 'Segoe UI', system-ui, sans-serif;
+	border: 1px solid rgba(0, 189, 232, 0.5);
+	border-radius: 6px;
+	background: rgba(0, 189, 232, 0.08);
+	color: #e8edf2;
 	cursor: pointer;
+	outline: none;
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2329b6f6'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 8px center;
+	padding-right: 24px;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.pgdb-widget__ring.is-active .pgdb-widget__ring-btn {
+.pgdb-widget__db-select:hover,
+.pgdb-widget__db-select:focus {
 	border-color: #00bde8;
-	background: linear-gradient(180deg, #d7f6ff 0%, #9fe7f7 52%, #c7f1fb 100%);
-	font-weight: 600;
+	background-color: rgba(0, 189, 232, 0.14);
+}
+.pgdb-widget__db-select option {
+	background: #1e2a35;
+	color: #e8edf2;
 }
 
 /* ── Host metrics ── */
@@ -179,12 +190,9 @@
 	transition: width 0.3s ease;
 }
 
-/* ── pgtune link (onder de database icon) ── */
+/* ── pgtune link (in flow, onder dropdown) ── */
 .pgdb-widget__pgtune-link {
-	position: absolute;
-	bottom: 6px;
-	left: -8px;
-	width: 148px;
+	width: 100%;
 	text-align: center;
 	font-size: 10px;
 	color: rgba(160, 180, 200, 0.6);
@@ -239,16 +247,14 @@
 
 /* ── Health score ── */
 .pgdb-widget__health {
-	position: absolute;
-	left: 295px;
-	top: 6px;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	justify-content: center;
+	justify-content: flex-start;
 	padding: 4px 8px;
 	gap: 1px;
-	width: 130px;
+	flex: 1;
+	min-width: 120px;
 }
 .pgdb-widget__health-title {
 	font-size: 10px;
