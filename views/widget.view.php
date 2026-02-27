@@ -68,21 +68,20 @@ $standby_label->addItem('Standby');
 $standby_wrap = (new CDiv())->addClass('pgdb-widget__repl-node pgdb-widget__repl-standby');
 $standby_wrap->addItem([$standby_icon, $standby_label]);
 
-// SVG line between the two nodes — JS will color it
-$repl_line_svg = (new CTag('svg', true))
+// Canvas line between the two nodes — JS animates via rAF
+$repl_canvas = (new CTag('canvas', true))
 	->addClass('pgdb-widget__repl-line js-pgdb-repl-line')
-	->setAttribute('viewBox', '0 0 80 40')
-	->setAttribute('preserveAspectRatio', 'none');
+	->setAttribute('height', '40');
 
-$repl_diagram->addItem([$primary_wrap, $repl_line_svg, $standby_wrap]);
+$repl_diagram->addItem([$primary_wrap, $repl_canvas, $standby_wrap]);
 
 $icon_wrap = (new CDiv())->addClass('pgdb-widget__icon-wrap');
 $icon_wrap->addItem([$repl_diagram, $db_select, $pgtune]);
 
-$visual->addItem([$icon_wrap, $health]);
+$visual->addItem($icon_wrap);
 
 $host_metrics = (new CDiv())->addClass('pgdb-widget__host-metrics js-pgdb-host-metrics');
-$header->addItem([$visual, $host_metrics]);
+$header->addItem([$visual, $health, $host_metrics]);
 
 $error = (new CDiv())->addClass('pgdb-widget__error js-pgdb-error');
 $cards = (new CDiv())->addClass('pgdb-widget__cards js-pgdb-cards');
