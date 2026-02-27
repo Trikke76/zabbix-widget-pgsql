@@ -37,8 +37,8 @@ $icon = (new CTag('img'))
 	->setAttribute('alt', 'PostgreSQL')
 	->setAttribute('loading', 'eager');
 
-$rings = (new CTag('ul', true))
-	->addClass('pgdb-widget__rings js-pgdb-rings');
+$db_select = (new CTag('select', true))
+	->addClass('pgdb-widget__db-select js-pgdb-db-select');
 
 $pgtune = (new CTag('a', true, '🔧 pgtune'))
 	->setAttribute('href', 'https://pgtune.leopard.in.ua/')
@@ -47,7 +47,11 @@ $pgtune = (new CTag('a', true, '🔧 pgtune'))
 	->addClass('pgdb-widget__pgtune-link');
 
 $health = (new CDiv())->addClass('pgdb-widget__health js-pgdb-health');
-$visual->addItem([$icon, $rings, $health, $pgtune]);
+
+$icon_wrap = (new CDiv())->addClass('pgdb-widget__icon-wrap');
+$icon_wrap->addItem([$icon, $db_select, $pgtune]);
+
+$visual->addItem([$icon_wrap, $health]);
 
 $host_metrics = (new CDiv())->addClass('pgdb-widget__host-metrics js-pgdb-host-metrics');
 $header->addItem([$visual, $host_metrics]);
