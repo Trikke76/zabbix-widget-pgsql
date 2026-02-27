@@ -15,13 +15,15 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		var root = this._body.querySelector('.js-pgdb-widget');
 		if (!root) return;
 
-		var icon = root.querySelector('.js-pgdb-icon');
-		if (icon && icon.dataset.pngSrc && !icon.dataset.pngChecked) {
-			icon.dataset.pngChecked = '1';
-			var probe = new Image();
-			probe.onload = function() { icon.src = icon.dataset.pngSrc; };
-			probe.src = icon.dataset.pngSrc;
-		}
+		// PNG probe for both primary and standby icons
+		root.querySelectorAll('.js-pgdb-icon, .js-pgdb-icon-standby').forEach(function(icon) {
+			if (icon.dataset.pngSrc && !icon.dataset.pngChecked) {
+				icon.dataset.pngChecked = '1';
+				var probe = new Image();
+				probe.onload = function() { icon.src = icon.dataset.pngSrc; };
+				probe.src = icon.dataset.pngSrc;
+			}
+		});
 
 		var model = {};
 		try { model = JSON.parse(root.dataset.model || '{}'); }
@@ -473,6 +475,74 @@ window.CWidgetPgsqlCluster = class extends CWidget {
 		});
 
 		if (selected) draw(selected);
+
+		// ── Replication line ─────────────────────────────────────────────────
+		(function() {
+			var lineSvg = root.querySelector('.js-pgdb-repl-line');
+			if (!lineSvg) return;
+
+			var lag = null;
+			var lagMetric = clusterMetrics['replication_lag'];
+			if (lagMetric && lagMetric.value !== null && lagMetric.value !== '') {
+				lag = Number(lagMetric.value);
+			}
+
+			// Color: green < 5s, yellow 5-30s, red > 30s, grey = no standby
+			var color, glowColor, label;
+			if (lag === null) {
+				color = 'rgba(120,140,160,0.35)'; glowColor = 'none'; label = null;
+			} else if (lag <= 5) {
+				color = '#4caf50'; glowColor = 'rgba(76,175,80,0.5)'; label = lag + 's';
+			} else if (lag <= 30) {
+				color = '#ff9800'; glowColor = 'rgba(255,152,0,0.5)'; label = lag + 's';
+			} else {
+				color = '#f44336'; glowColor = 'rgba(244,67,54,0.5)'; label = lag + 's';
+			}
+
+			// Animated dashes flowing from left to right
+			var animId = 'pgdb-dash-anim';
+			var dashAnim = lag !== null
+				? '<style>@keyframes ' + animId + '{to{stroke-dashoffset:-20px}}</style>'
+				: '';
+
+			var dashStyle = lag !== null
+				? 'stroke-dasharray:6 4;stroke-dashoffset:0;animation:' + animId + ' 0.8s linear infinite;'
+				: 'stroke-dasharray:4 6;opacity:0.4;';
+
+			// Glow filter
+			var glowFilter = lag !== null && glowColor !== 'none'
+				? '<defs><filter id="pgdb-glow" x="-50%" y="-50%" width="200%" height="200%">' +
+					'<feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>' +
+					'<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+				  '</filter></defs>'
+				: '<defs></defs>';
+
+			var filterAttr = lag !== null ? ' filter="url(#pgdb-glow)"' : '';
+
+			// Lag label in the middle of the line
+			var labelHtml = label
+				? '<text x="40" y="14" text-anchor="middle" font-size="8" fill="' + color + '" font-family="Segoe UI,system-ui,sans-serif" opacity="0.9">' + label + '</text>'
+				: '';
+
+			// Arrow head at the right end
+			var arrowHtml = lag !== null
+				? '<polygon points="74,20 68,16 68,24" fill="' + color + '" opacity="0.9"/>'
+				: '';
+
+			lineSvg.innerHTML =
+				dashAnim +
+				glowFilter +
+				'<line x1="4" y1="20" x2="72" y2="20" stroke="' + color + '" stroke-width="2"' +
+				filterAttr + ' style="' + dashStyle + '"/>' +
+				arrowHtml +
+				labelHtml;
+
+			// Grey out standby icon if no replication
+			var standbyIcon = root.querySelector('.pgdb-widget__icon--standby');
+			if (standbyIcon) {
+				standbyIcon.style.opacity = lag === null ? '0.3' : '0.85';
+			}
+		})();
 
 		// ── Tooltip setup: only attach once per root element ─────────────────
 		if (!root.dataset.tooltipInit) {
