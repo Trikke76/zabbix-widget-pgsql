@@ -48,8 +48,36 @@ $pgtune = (new CTag('a', true, '🔧 pgtune'))
 
 $health = (new CDiv())->addClass('pgdb-widget__health js-pgdb-health');
 
+// Replication diagram: primary + line + standby + dropdown + pgtune
+$repl_diagram = (new CDiv())->addClass('pgdb-widget__repl-diagram');
+
+$primary_wrap = (new CDiv())->addClass('pgdb-widget__repl-node pgdb-widget__repl-primary');
+$primary_label = (new CDiv())->addClass('pgdb-widget__repl-label');
+$primary_label->addItem('Primary');
+$primary_wrap->addItem([$icon, $primary_label]);
+
+// Standby icon (same image, slightly smaller)
+$standby_icon = (new CTag('img'))
+	->addClass('pgdb-widget__icon pgdb-widget__icon--standby js-pgdb-icon-standby')
+	->setAttribute('src', $asset_base . '/img/postgres-icon-24.svg')
+	->setAttribute('data-png-src', $asset_base . '/img/postgres-icon-24.png')
+	->setAttribute('alt', 'Standby')
+	->setAttribute('loading', 'eager');
+$standby_label = (new CDiv())->addClass('pgdb-widget__repl-label');
+$standby_label->addItem('Standby');
+$standby_wrap = (new CDiv())->addClass('pgdb-widget__repl-node pgdb-widget__repl-standby');
+$standby_wrap->addItem([$standby_icon, $standby_label]);
+
+// SVG line between the two nodes — JS will color it
+$repl_line_svg = (new CTag('svg', true))
+	->addClass('pgdb-widget__repl-line js-pgdb-repl-line')
+	->setAttribute('viewBox', '0 0 80 40')
+	->setAttribute('preserveAspectRatio', 'none');
+
+$repl_diagram->addItem([$primary_wrap, $repl_line_svg, $standby_wrap]);
+
 $icon_wrap = (new CDiv())->addClass('pgdb-widget__icon-wrap');
-$icon_wrap->addItem([$icon, $db_select, $pgtune]);
+$icon_wrap->addItem([$repl_diagram, $db_select, $pgtune]);
 
 $visual->addItem([$icon_wrap, $health]);
 
