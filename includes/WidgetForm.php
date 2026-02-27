@@ -42,6 +42,16 @@ class WidgetForm extends CWidgetForm {
 				]))->setDefault('86400')
 			)
 
+			// ── Trigger alerts ────────────────────────────────────────────
+			->addField(
+				(new CWidgetFieldSelect('alert_severity', _('Alert badge severity'), [
+					'0' => _('Alle severities'),
+					'3' => _('Average en hoger'),
+					'4' => _('High en hoger'),
+					'5' => _('Alleen Disaster'),
+				]))->setDefault('3')
+			)
+
 			// ── CPU thresholds ────────────────────────────────────────────
 			->addField(
 				(new CWidgetFieldTextBox('cpu_warn_threshold', _('CPU warn threshold')))
@@ -50,6 +60,32 @@ class WidgetForm extends CWidgetForm {
 			->addField(
 				(new CWidgetFieldTextBox('cpu_high_threshold', _('CPU high threshold')))
 					->setDefault('2.00')
+			)
+
+			// ── Health score weights ──────────────────────────────────────
+			->addField(
+				(new CWidgetFieldTextBox('health_weight_connectivity', _('Health weight: Connectivity (%)')))
+					->setDefault('25')
+			)
+			->addField(
+				(new CWidgetFieldTextBox('health_weight_integriteit', _('Health weight: Integriteit (%)')))
+					->setDefault('20')
+			)
+			->addField(
+				(new CWidgetFieldTextBox('health_weight_stabiliteit', _('Health weight: Stabiliteit (%)')))
+					->setDefault('20')
+			)
+			->addField(
+				(new CWidgetFieldTextBox('health_weight_efficiency', _('Health weight: Efficiency (%)')))
+					->setDefault('20')
+			)
+			->addField(
+				(new CWidgetFieldTextBox('health_weight_replication', _('Health weight: Replication (%)')))
+					->setDefault('10')
+			)
+			->addField(
+				(new CWidgetFieldTextBox('health_weight_bloat', _('Health weight: Bloat (%)')))
+					->setDefault('5')
 			)
 
 			// ── Host metrics: show + item key override ────────────────────
