@@ -4,7 +4,7 @@
   "type": "widget",
   "name": "PostgreSQL Cluster Overview",
   "namespace": "PgsqlClusterWidget",
-  "version": "1.0.3",
+  "version": "1.1",
   "author": "OICTS",
   "description": "Selecteerbare PostgreSQL database widget op basis van PostgreSQL by Zabbix agent 2 template.",
   "actions": {
