@@ -124,3 +124,7 @@ zabbix-widget-pgsql/
 │       └── database.png
 └── README.md
 ```
+---
+
+Parts of this software were generated using Codex. We do not guarantee the total accuracy, security, or stability of the generated code.
+
